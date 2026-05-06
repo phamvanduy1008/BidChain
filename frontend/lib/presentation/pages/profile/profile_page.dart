@@ -206,7 +206,7 @@ class _ProfilePageState extends State<ProfilePage> {
                               crossAxisCount: 2,
                               shrinkWrap: true,
                               physics: const NeverScrollableScrollPhysics(),
-                              childAspectRatio: 1.4,
+                              childAspectRatio: 1.15,
                               mainAxisSpacing: 12,
                               crossAxisSpacing: 12,
                               children: [
@@ -300,7 +300,7 @@ class _ProfilePageState extends State<ProfilePage> {
 
   Widget _buildStat(IconData icon, String value, String label) {
     return Container(
-      padding: const EdgeInsets.symmetric(vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
       decoration: BoxDecoration(
         color: AppColors.greyLight,
         borderRadius: BorderRadius.circular(16),
@@ -309,27 +309,35 @@ class _ProfilePageState extends State<ProfilePage> {
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Container(
-            padding: const EdgeInsets.all(10),
+            padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
               color: AppColors.white,
               shape: BoxShape.circle,
             ),
-            child: Icon(icon, size: 28, color: AppColors.accent),
+            child: Icon(icon, size: 24, color: AppColors.accent),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 8),
           Text(
             value,
             style: AppTextStyles.h3.copyWith(
               fontWeight: FontWeight.bold,
               color: AppColors.accent,
             ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
           ),
-          const SizedBox(height: 6),
-          Text(
-            label,
-            style: AppTextStyles.bodySmall.copyWith(
-              color: AppColors.grey,
-              fontWeight: FontWeight.w500,
+          const SizedBox(height: 4),
+          Flexible(
+            child: Text(
+              label,
+              style: AppTextStyles.bodySmall.copyWith(
+                color: AppColors.grey,
+                fontWeight: FontWeight.w500,
+                fontSize: 11,
+              ),
+              textAlign: TextAlign.center,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
             ),
           ),
         ],

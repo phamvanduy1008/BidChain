@@ -29,6 +29,7 @@ class BidHistoryCard extends StatelessWidget {
         ),
       ),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           UserAvatar(name: bid.userName, size: 40),
           const SizedBox(width: 12),
@@ -38,11 +39,15 @@ class BidHistoryCard extends StatelessWidget {
               children: [
                 Row(
                   children: [
-                    Text(
-                      bid.userName,
-                      style: AppTextStyles.bodyMedium.copyWith(
-                        color: AppColors.accent,
-                        fontWeight: FontWeight.w600,
+                    Expanded(
+                      child: Text(
+                        bid.userName,
+                        style: AppTextStyles.bodyMedium.copyWith(
+                          color: AppColors.accent,
+                          fontWeight: FontWeight.w600,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
                     ),
                     if (isHighest) ...[
@@ -69,23 +74,50 @@ class BidHistoryCard extends StatelessWidget {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  timeago.format(bid.createdAt, locale: 'vi'),
+                  _formatRelativeTime(bid.createdAt),
                   style: AppTextStyles.bodySmall.copyWith(
                     color: AppColors.grey,
                   ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
               ],
             ),
           ),
-          Text(
-            bid.formattedAmount,
-            style: AppTextStyles.bodyLarge.copyWith(
-              color: isHighest ? AppColors.success : AppColors.tertiary,
-              fontWeight: FontWeight.bold,
+          const SizedBox(width: 12),
+          SizedBox(
+            width: 120,
+            child: Text(
+              bid.formattedAmount,
+              textAlign: TextAlign.right,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: AppTextStyles.bodyLarge.copyWith(
+                color: isHighest ? AppColors.success : AppColors.tertiary,
+                fontWeight: FontWeight.bold,
+              ),
             ),
           ),
         ],
       ),
     );
+  }
+
+  String _formatRelativeTime(DateTime createdAt) {
+    final difference = DateTime.now().difference(createdAt);
+
+    if (difference.inMinutes < 1) {
+      return 'Vừa xong';
+    }
+    if (difference.inHours < 1) {
+      return '${difference.inMinutes} phút trước';
+    }
+    if (difference.inDays < 1) {
+      return '${difference.inHours} giờ trước';
+    }
+    if (difference.inDays < 30) {
+      return '${difference.inDays} ngày trước';
+    }
+    return timeago.format(createdAt);
   }
 }
