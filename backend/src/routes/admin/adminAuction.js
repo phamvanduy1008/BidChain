@@ -1,5 +1,8 @@
 const express = require('express');
 const router = express.Router();
+const fs = require('fs');
+const path = require('path');
+const ethers = require('ethers');
 const { param, query, body, validationResult } = require('express-validator');
 const { authMiddleware } = require('../../middleware/auth');
 const User = require('../../models/User');
@@ -10,6 +13,20 @@ const { deployAuctionContract } = require('../../blockchain/deploy');
 const { provider, walletFromPrivateKey, contract } = require('../../blockchain/contract');
 const { decrypt } = require('../../utils/crypto');
 const { AUCTION_STATUS } = require('../../config/constants');
+
+function getAuctionContractAt(contractAddress, signerOrProvider = provider) {
+  const abiPath = process.env.CONTRACT_ABI_PATH || './abi/Auction.json';
+  const abiRaw = fs.readFileSync(path.resolve(abiPath), 'utf8');
+  const abiParsed = JSON.parse(abiRaw);
+  const abi = abiParsed.abi || abiParsed;
+  return new ethers.Contract(contractAddress, abi, signerOrProvider);
+}
+
+async function contractHasFunction(contractAddress, signature) {
+  const selector = ethers.utils.id(signature).slice(2, 10).toLowerCase();
+  const code = await provider.getCode(contractAddress);
+  return code.toLowerCase().includes(selector);
+}
 
 // Role helper
 async function requireRole(req, res, next) {
@@ -258,25 +275,63 @@ router.post('/:id/start', authMiddleware, requireRole, [param('id').isMongoId()]
   }
 });
 
-// POST /api/admin/auctions/:id/end - Admin: trigger on-chain endAuction using ADMIN private key
+// POST /api/admin/auctions/:id/end - Admin: trigger on-chain endAuction using deployer key
 router.post('/:id/end', authMiddleware, requireRole, [param('id').isMongoId()], async (req, res) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
+
   try {
     const requester = req.requester;
     if (requester.role !== 'ADMIN') return res.status(403).json({ error: 'Admin only' });
+
     const auction = await Auction.findById(req.params.id);
     if (!auction) return res.status(404).json({ error: 'Auction not found' });
 
+    if (!auction.contract_address || !auction.blockchain_id) {
+      return res.status(400).json({ 
+        error: 'Auction missing blockchain contract_address or blockchain_id' 
+      });
+    }
+
     try {
-      const adminWallet = walletFromPrivateKey(process.env.ADMIN_PRIVATE_KEY);
-      const tx = await contract.connect(adminWallet).endAuction(BigInt(auction._id));
+      const supportsEndAuction = await contractHasFunction(auction.contract_address, 'endAuction(uint256)');
+      if (!supportsEndAuction) {
+        return res.status(409).json({
+          error: 'Failed to end on-chain',
+          details: 'The deployed auction contract does not contain endAuction(uint256). This auction was deployed with an older Auction contract; deploy/approve it again with the latest contract before calling force end.'
+        });
+      }
+
+      // The deployer created the auction on-chain, so it is the on-chain seller.
+      const deployerWallet = walletFromPrivateKey(process.env.DEPLOYER_PRIVATE_KEY);
+      const auctionContract = getAuctionContractAt(auction.contract_address, deployerWallet);
+
+      const tx = await auctionContract.endAuction(auction.blockchain_id);
       const receipt = await tx.wait();
-      // Mark auction as ENDED
-      await Auction.findByIdAndUpdate(auction._id, { status: AUCTION_STATUS.ENDED });
-      return res.json({ success: true, message: 'Auction ended on-chain', tx_hash: receipt.transactionHash });
+
+      // === THAY ĐỔI Ở ĐÂY ===
+      await Auction.findByIdAndUpdate(auction._id, { 
+        status: AUCTION_STATUS.ADMIN_ENDED,     // ← Đổi thành ADMIN_ENDED
+        ended_by_admin: true,
+        ended_by: requester._id,
+        ended_at: new Date()
+      });
+
+      return res.json({ 
+        success: true, 
+        message: 'Auction ended on-chain by Admin', 
+        tx_hash: receipt.transactionHash 
+      });
+
     } catch (chainErr) {
       console.error('endAuction chain error', chainErr);
+      if (chainErr.code === 'CALL_EXCEPTION' || /function selector|missing revert data|revert/i.test(chainErr.message || '')) {
+        return res.status(409).json({
+          error: 'Failed to end on-chain',
+          details: 'This auction contract was likely deployed before endAuction existed. Redeploy/re-approve the auction with the latest Auction contract, then retry.',
+          original: chainErr.message
+        });
+      }
       return res.status(500).json({ error: 'Failed to end on-chain', details: chainErr.message });
     }
 
@@ -285,7 +340,6 @@ router.post('/:id/end', authMiddleware, requireRole, [param('id').isMongoId()], 
     return res.status(500).json({ error: 'Failed to end auction' });
   }
 });
-
 // POST /api/admin/auctions/:id/settle - Admin: finalise auction (mark SETTLED, create notifications) - logic may vary by project
 router.post('/:id/settle', authMiddleware, requireRole, [param('id').isMongoId()], async (req, res) => {
   const errors = validationResult(req);

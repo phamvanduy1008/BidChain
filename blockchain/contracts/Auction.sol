@@ -76,6 +76,10 @@ contract Auction {
         uint256 indexed auctionId
     );
 
+    event AuctionEnded(
+        uint256 indexed auctionId
+    );
+
     event BidRecorded(
         uint256 indexed auctionId,
         address indexed bidder,
@@ -238,6 +242,25 @@ contract Auction {
         auction.ended = true;
 
         emit AuctionCancelled(_auctionId);
+    }
+
+    /**
+     * @notice End an auction early or after expiry (called by backend/deployer)
+     * @param _auctionId Auction ID to end
+     */
+    function endAuction(uint256 _auctionId)
+        external
+        auctionExists(_auctionId)
+        onlySeller(_auctionId)
+    {
+        AuctionMetadata storage auction = auctions[_auctionId];
+
+        require(!auction.ended, "Auction ended");
+        require(!auction.settled, "Auction settled");
+
+        auction.ended = true;
+
+        emit AuctionEnded(_auctionId);
     }
 
     /**

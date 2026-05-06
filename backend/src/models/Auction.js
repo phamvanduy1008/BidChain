@@ -8,7 +8,7 @@ const AuctionSchema = new mongoose.Schema({
   category_id: { type: mongoose.Schema.Types.ObjectId, ref: 'Category', required: true },
   status: {
     type: String,
-    enum: ['PENDING_APPROVAL', 'APPROVED', 'REJECTED', 'DEPLOYING', 'ACTIVE', 'ENDED', 'WAITING_CONFIRMATION', 'SETTLED'],
+    enum: ['PENDING_APPROVAL', 'APPROVED', 'REJECTED', 'DEPLOYING', 'ACTIVE', 'ENDED', 'WAITING_CONFIRMATION', 'ADMIN_ENDED', 'SETTLED'],
     required: true,
     default: 'PENDING_APPROVAL'
   },
@@ -17,6 +17,9 @@ const AuctionSchema = new mongoose.Schema({
   approved_at: { type: Date },
   contract_address: { type: String },
   deploy_tx_hash: { type: String },
+  ended_by_admin: { type: Boolean, default: false },
+  ended_by: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+  ended_at: { type: Date },
 
   // PHẢI DÙNG STRING WEI - KHÔNG DÙNG Decimal128 NỮA!
   start_price: {
