@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import '../../../config/routes/app_routes.dart';
 import '../../../config/theme/app_colors.dart';
 import '../../../config/theme/app_text_styles.dart';
+import '../../../core/utils/app_localizations.dart';
 import '../../bloc/auction/auction_bloc.dart';
 import '../../bloc/auction/auction_event.dart';
 import '../../bloc/auction/auction_state.dart';
@@ -129,7 +130,7 @@ class _HomePageState extends State<HomePage>
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 20),
                     child: Text(
-                      'Categories',
+                      'Danh mục',
                       style: AppTextStyles.h3.copyWith(
                         color: AppColors.black,
                         fontWeight: FontWeight.bold,
@@ -184,7 +185,7 @@ class _HomePageState extends State<HomePage>
                         Padding(
                           padding: const EdgeInsets.symmetric(horizontal: 20),
                           child: SectionHeader(
-                            title: 'Popular Auctions',
+                            title: 'Đấu giá nổi bật',
                             onSeeAllTap: () =>
                                 context.go(AppRoutes.auctionList),
                           ),
@@ -239,7 +240,7 @@ class _HomePageState extends State<HomePage>
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 20),
                 child: SectionHeader(
-                  title: 'Active Auctions',
+                  title: 'Phiên đang diễn ra',
                   onSeeAllTap: () => context.go(AppRoutes.auctionList),
                 ),
               ),
@@ -274,7 +275,7 @@ class _HomePageState extends State<HomePage>
                                 RefreshAuctions(),
                               );
                             },
-                            child: const Text('Retry'),
+                            child: const Text('Thử lại'),
                           ),
                         ],
                       ),
@@ -318,8 +319,8 @@ class _HomePageState extends State<HomePage>
                             const SizedBox(height: 16),
                             Text(
                               _selectedCategoryId != null
-                                  ? 'No auctions found in this category'
-                                  : 'No active auctions found',
+                                  ? 'Không có phiên đấu giá nào trong danh mục này'
+                                  : 'Hiện chưa có phiên đấu giá đang diễn ra',
                               style: AppTextStyles.bodyMedium.copyWith(
                                 color: AppColors.grey,
                               ),
@@ -424,7 +425,7 @@ class _HomePageState extends State<HomePage>
       child: TextField(
         controller: _searchController,
         decoration: InputDecoration(
-          hintText: 'Search auctions...',
+          hintText: 'Tìm kiếm phiên đấu giá...',
           hintStyle: AppTextStyles.bodyMedium.copyWith(color: AppColors.grey),
           prefixIcon: const Icon(Icons.search, color: AppColors.black),
           suffixIcon: _searchQuery.isNotEmpty
@@ -451,7 +452,7 @@ class _HomePageState extends State<HomePage>
         if (state is CategoryLoaded) {
           // Add "All" category at the beginning
           final allCategories = [
-            {'id': null, 'name': 'All', 'icon': Icons.apps},
+            {'id': null, 'name': 'Tất cả', 'icon': Icons.apps},
             ...state.categories.map(
               (cat) => {
                 'id': cat.id,
@@ -503,7 +504,7 @@ class _HomePageState extends State<HomePage>
               padding: const EdgeInsets.symmetric(horizontal: 20),
               children: [
                 CategoryChip(
-                  label: 'All',
+                  label: 'Tất cả',
                   icon: Icons.apps,
                   isSelected: _selectedCategoryId == null,
                   onTap: () {
@@ -561,19 +562,8 @@ class _HomePageState extends State<HomePage>
     final difference = endTime.difference(now);
 
     if (difference.isNegative) {
-      return 'Ended';
+      return AppLocalizations.formatTimeLeft(endTime);
     }
-
-    if (difference.inDays > 0) {
-      final hours = difference.inHours % 24;
-      return '${difference.inDays}d ${hours}h';
-    } else if (difference.inHours > 0) {
-      final minutes = difference.inMinutes % 60;
-      return '${difference.inHours}h ${minutes}m';
-    } else if (difference.inMinutes > 0) {
-      return '${difference.inMinutes}m';
-    } else {
-      return '${difference.inSeconds}s';
-    }
+    return AppLocalizations.formatTimeLeft(endTime);
   }
 }

@@ -55,11 +55,10 @@ class _LoginPageState extends State<LoginPage> {
 
   void _handleLogin() {
     if (!_validateForm()) {
-      Toast.error(context, 'Please fix the errors before continuing');
+      Toast.error(context, 'Vui lòng kiểm tra lại thông tin trước khi tiếp tục');
       return;
     }
 
-    // Dispatch login event to BLoC
     context.read<AuthBloc>().add(
           AuthLoginEvent(
             username: _usernameController.text.trim(),
@@ -73,7 +72,7 @@ class _LoginPageState extends State<LoginPage> {
   }
 
   void _navigateToForgotPassword() {
-    Toast.info(context, 'Forgot password feature will be available soon');
+    Toast.info(context, 'Chức năng quên mật khẩu sẽ được cập nhật sau');
   }
 
   @override
@@ -83,10 +82,10 @@ class _LoginPageState extends State<LoginPage> {
     return BlocListener<AuthBloc, AuthState>(
       listener: (context, state) {
         if (state is AuthLoadingState) {
-          LoadingOverlay.show(context, message: 'Signing in...');
+          LoadingOverlay.show(context, message: 'Đang đăng nhập...');
         } else if (state is AuthSuccessState) {
           LoadingOverlay.hide();
-          Toast.success(context, 'Login successful! Welcome back.');
+          Toast.success(context, 'Đăng nhập thành công');
           Future.delayed(const Duration(milliseconds: 500), () {
             if (mounted) context.go(AppRoutes.home);
           });
@@ -99,19 +98,13 @@ class _LoginPageState extends State<LoginPage> {
         body: Container(
           width: double.infinity,
           height: double.infinity,
-          decoration: BoxDecoration(
-           color: AppColors.primary,
-            
-            
-          ),
+          decoration: const BoxDecoration(color: AppColors.primary),
           child: SafeArea(
             child: SingleChildScrollView(
               padding: const EdgeInsets.symmetric(horizontal: 24),
               child: Column(
                 children: [
                   SizedBox(height: size.height * 0.08),
-
-                  // Logo and Title
                   Container(
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
@@ -133,7 +126,7 @@ class _LoginPageState extends State<LoginPage> {
                   ),
                   const SizedBox(height: 24),
                   Text(
-                    'Welcome to BidChain',
+                    'Chào mừng đến với BidChain',
                     style: AppTextStyles.h1.copyWith(
                       color: AppColors.black,
                       fontSize: 32,
@@ -142,15 +135,13 @@ class _LoginPageState extends State<LoginPage> {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    'Sign in to continue',
+                    'Đăng nhập để tiếp tục',
                     style: AppTextStyles.bodyLarge.copyWith(
                       color: AppColors.black.withOpacity(0.9),
                     ),
                     textAlign: TextAlign.center,
                   ),
                   const SizedBox(height: 48),
-
-                  // Login Form Card
                   Container(
                     padding: const EdgeInsets.all(24),
                     decoration: BoxDecoration(
@@ -170,49 +161,43 @@ class _LoginPageState extends State<LoginPage> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            'Login',
+                            'Đăng nhập',
                             style: AppTextStyles.h2.copyWith(
                               color: AppColors.black,
                             ),
                           ),
                           const SizedBox(height: 24),
-
-                          // Username Input
                           FormInput(
                             value: _usernameController.text,
                             onChangeText: (value) {
                               _usernameController.text = value;
                               _validateUsername();
                             },
-                            label: 'Username',
-                            hint: 'Enter your username',
+                            label: 'Tên đăng nhập',
+                            hint: 'Nhập tên đăng nhập',
                             error: _usernameError,
                             prefixIcon: Icons.person_outline,
                           ),
                           const SizedBox(height: 16),
-
-                          // Password Input
                           FormInput(
                             value: _passwordController.text,
                             onChangeText: (value) {
                               _passwordController.text = value;
                               _validatePassword();
                             },
-                            label: 'Password',
-                            hint: 'Enter your password',
+                            label: 'Mật khẩu',
+                            hint: 'Nhập mật khẩu',
                             error: _passwordError,
                             prefixIcon: Icons.lock_outline,
                             secureText: true,
                           ),
                           const SizedBox(height: 8),
-
-                          // Forgot Password
                           Align(
                             alignment: Alignment.centerRight,
                             child: TextButton(
                               onPressed: _navigateToForgotPassword,
                               child: Text(
-                                'Forgot Password?',
+                                'Quên mật khẩu?',
                                 style: AppTextStyles.bodyMedium.copyWith(
                                   color: AppColors.accent,
                                 ),
@@ -220,8 +205,6 @@ class _LoginPageState extends State<LoginPage> {
                             ),
                           ),
                           const SizedBox(height: 24),
-
-                          // Login Button
                           BlocBuilder<AuthBloc, AuthState>(
                             builder: (context, state) {
                               final isLoading = state is AuthLoadingState;
@@ -229,7 +212,7 @@ class _LoginPageState extends State<LoginPage> {
                                 alignment: Alignment.center,
                                 child: PrimaryButton(
                                   width: double.infinity,
-                                  title: 'Sign In',
+                                  title: 'Đăng nhập',
                                   onPress: isLoading ? null : _handleLogin,
                                   loading: isLoading,
                                 ),
@@ -237,8 +220,6 @@ class _LoginPageState extends State<LoginPage> {
                             },
                           ),
                           const SizedBox(height: 16),
-
-                          // Register Text Link
                           Align(
                             alignment: Alignment.center,
                             child: TextButton(
@@ -250,10 +231,10 @@ class _LoginPageState extends State<LoginPage> {
                                   ),
                                   children: [
                                     const TextSpan(
-                                      text: "Don't have an account? ",
+                                      text: 'Chưa có tài khoản? ',
                                     ),
                                     TextSpan(
-                                      text: 'Create Account',
+                                      text: 'Tạo tài khoản',
                                       style: AppTextStyles.bodyMedium.copyWith(
                                         color: AppColors.accent,
                                         fontWeight: FontWeight.w600,

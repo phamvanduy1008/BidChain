@@ -23,11 +23,11 @@ class _NotificationPageState extends State<NotificationPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Notifications'),
+        title: const Text('Thông báo'),
         actions: [
           IconButton(
             icon: const Icon(Icons.done_all),
-            tooltip: 'Mark all as read',
+            tooltip: 'Đánh dấu tất cả đã đọc',
             onPressed: () {
               context.read<NotificationBloc>().add(MarkAsReadEvent([]));
             },
@@ -41,7 +41,7 @@ class _NotificationPageState extends State<NotificationPage> {
           }
 
           if (state.error != null && state.notifications.isEmpty) {
-            return Center(child: Text('Error: ${state.error}'));
+            return Center(child: Text('Lỗi: ${state.error}'));
           }
 
           if (state.notifications.isEmpty) {
@@ -56,7 +56,7 @@ class _NotificationPageState extends State<NotificationPage> {
                   ),
                   SizedBox(height: 16),
                   Text(
-                    'No notifications yet',
+                    'Chưa có thông báo nào',
                     style: TextStyle(color: Colors.grey),
                   ),
                 ],

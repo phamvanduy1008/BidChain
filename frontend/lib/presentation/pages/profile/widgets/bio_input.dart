@@ -34,7 +34,7 @@ class _BioInputState extends State<BioInput> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'Bio (Optional)',
+          'Tiểu sử (Không bắt buộc)',
           style: AppTextStyles.bodyMedium.copyWith(fontWeight: FontWeight.w600),
         ),
         const SizedBox(height: 6),
@@ -43,7 +43,7 @@ class _BioInputState extends State<BioInput> {
           maxLines: 4,
           maxLength: maxBioLength,
           decoration: InputDecoration(
-            hintText: 'Tell us about yourself...',
+            hintText: 'Hãy kể cho chúng tôi biết về bạn...',
             contentPadding: const EdgeInsets.symmetric(
               horizontal: 12,
               vertical: 10,

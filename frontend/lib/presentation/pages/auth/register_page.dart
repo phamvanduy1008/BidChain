@@ -61,14 +61,7 @@ class _RegisterPageState extends State<RegisterPage> {
 
   void _validateFullName() {
     setState(() {
-      final fullName = _fullNameController.text.trim();
-      if (fullName.isEmpty) {
-        _fullNameError = 'Full name is required';
-      } else if (fullName.length < 3) {
-        _fullNameError = 'Full name must be at least 3 characters';
-      } else {
-        _fullNameError = null;
-      }
+      _fullNameError = Validators.validateFullName(_fullNameController.text);
     });
   }
 
@@ -102,19 +95,16 @@ class _RegisterPageState extends State<RegisterPage> {
   }
 
   void _handleRegister() {
-    // Validate terms acceptance
     if (!_agreeToTerms) {
-      Toast.error(context, 'Please agree to Terms & Conditions');
+      Toast.error(context, 'Vui lòng đồng ý với điều khoản sử dụng');
       return;
     }
 
-    // Validate form
     if (!_validateForm()) {
-      Toast.error(context, 'Please fix the errors before continuing');
+      Toast.error(context, 'Vui lòng kiểm tra lại thông tin trước khi tiếp tục');
       return;
     }
 
-    // Dispatch register event to BLoC
     context.read<AuthBloc>().add(
           AuthRegisterEvent(
             username: _usernameController.text.trim(),
@@ -130,10 +120,10 @@ class _RegisterPageState extends State<RegisterPage> {
     return BlocListener<AuthBloc, AuthState>(
       listener: (context, state) {
         if (state is AuthLoadingState) {
-          LoadingOverlay.show(context, message: 'Creating your account...');
+          LoadingOverlay.show(context, message: 'Đang tạo tài khoản...');
         } else if (state is AuthSuccessState) {
           LoadingOverlay.hide();
-          Toast.success(context, 'Account created successfully!');
+          Toast.success(context, 'Tạo tài khoản thành công');
           Future.delayed(const Duration(milliseconds: 1500), () {
             if (mounted) context.go(AppRoutes.login);
           });
@@ -163,52 +153,39 @@ class _RegisterPageState extends State<RegisterPage> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     const SizedBox(height: 20),
-
-                    // Back button
                     CustomBackButton(
                       onPressed: () => context.go(AppRoutes.login),
                     ),
-
                     const SizedBox(height: 24),
-
-                    // Title
                     Text(
-                      'Create Account',
+                      'Tạo tài khoản',
                       style: AppTextStyles.h1.copyWith(
                         color: AppColors.black,
                         fontSize: 32,
                         fontWeight: FontWeight.bold,
                       ),
                     ),
-
                     const SizedBox(height: 8),
-
                     Text(
-                      'Sign up to start bidding',
+                      'Đăng ký để bắt đầu tham gia đấu giá',
                       style: AppTextStyles.bodyLarge.copyWith(
                         color: AppColors.grey,
                       ),
                     ),
-
                     const SizedBox(height: 40),
-
-                    // Full Name Input
                     FormInput(
-                      label: 'Full Name',
+                      label: 'Họ và tên',
                       value: _fullNameController.text,
                       onChangeText: (value) {
                         _fullNameController.text = value;
                         _validateFullName();
                       },
                       error: _fullNameError,
-                      hint: 'Enter your full name',
+                      hint: 'Nhập họ và tên',
                       prefixIcon: Icons.badge_outlined,
                       textInputAction: TextInputAction.next,
                     ),
-
                     const SizedBox(height: 20),
-
-                    // Email Input
                     FormInput(
                       label: 'Email',
                       value: _emailController.text,
@@ -217,64 +194,52 @@ class _RegisterPageState extends State<RegisterPage> {
                         _validateEmail();
                       },
                       error: _emailError,
-                      hint: 'Enter your email address',
+                      hint: 'Nhập địa chỉ email',
                       prefixIcon: Icons.email_outlined,
                       textInputAction: TextInputAction.next,
                     ),
-
                     const SizedBox(height: 20),
-
-                    // Username Input
                     FormInput(
-                      label: 'Username',
+                      label: 'Tên đăng nhập',
                       value: _usernameController.text,
                       onChangeText: (value) {
                         _usernameController.text = value;
                         _validateUsername();
                       },
                       error: _usernameError,
-                      hint: 'Choose a username (min 3 characters)',
+                      hint: 'Chọn tên đăng nhập (ít nhất 3 ký tự)',
                       prefixIcon: Icons.person_outline,
                       textInputAction: TextInputAction.next,
                     ),
-
                     const SizedBox(height: 20),
-
-                    // Password Input
                     FormInput(
-                      label: 'Password',
+                      label: 'Mật khẩu',
                       value: _passwordController.text,
                       onChangeText: (value) {
                         _passwordController.text = value;
                         _validatePassword();
                       },
                       error: _passwordError,
-                      hint: 'Create a strong password (min 8 characters)',
+                      hint: 'Tạo mật khẩu mạnh (ít nhất 8 ký tự)',
                       secureText: true,
                       prefixIcon: Icons.lock_outline,
                       textInputAction: TextInputAction.next,
                     ),
-
                     const SizedBox(height: 20),
-
-                    // Confirm Password Input
                     FormInput(
-                      label: 'Confirm Password',
+                      label: 'Xác nhận mật khẩu',
                       value: _confirmPasswordController.text,
                       onChangeText: (value) {
                         _confirmPasswordController.text = value;
                         _validateConfirmPassword();
                       },
                       error: _confirmPasswordError,
-                      hint: 'Re-enter your password',
+                      hint: 'Nhập lại mật khẩu',
                       secureText: true,
                       prefixIcon: Icons.lock_outline,
                       textInputAction: TextInputAction.done,
                     ),
-
                     const SizedBox(height: 24),
-
-                    // Terms & Conditions Checkbox
                     Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -300,26 +265,26 @@ class _RegisterPageState extends State<RegisterPage> {
                             },
                             child: Text.rich(
                               TextSpan(
-                                text: 'I agree to the ',
+                                text: 'Tôi đồng ý với ',
                                 style: AppTextStyles.bodyMedium.copyWith(
                                   color: AppColors.grey,
                                 ),
                                 children: [
                                   TextSpan(
-                                    text: 'Terms & Conditions',
+                                    text: 'Điều khoản sử dụng',
                                     style: AppTextStyles.labelMedium.copyWith(
                                       color: AppColors.accent,
                                       fontWeight: FontWeight.w600,
                                     ),
                                   ),
                                   TextSpan(
-                                    text: ' and ',
+                                    text: ' và ',
                                     style: AppTextStyles.bodyMedium.copyWith(
                                       color: AppColors.grey,
                                     ),
                                   ),
                                   TextSpan(
-                                    text: 'Privacy Policy',
+                                    text: 'Chính sách bảo mật',
                                     style: AppTextStyles.labelMedium.copyWith(
                                       color: AppColors.accent,
                                       fontWeight: FontWeight.w600,
@@ -332,27 +297,21 @@ class _RegisterPageState extends State<RegisterPage> {
                         ),
                       ],
                     ),
-
                     const SizedBox(height: 32),
-
-                    // Register Button
                     BlocBuilder<AuthBloc, AuthState>(
                       builder: (context, state) {
                         final isLoading = state is AuthLoadingState;
                         return Align(
                           alignment: Alignment.center,
                           child: PrimaryButton(
-                            title: 'Create Account',
+                            title: 'Tạo tài khoản',
                             onPress: isLoading ? null : _handleRegister,
                             loading: isLoading,
                           ),
                         );
                       },
                     ),
-
                     const SizedBox(height: 32),
-
-                    // Already have account link
                     Align(
                       alignment: Alignment.center,
                       child: TextButton(
@@ -363,9 +322,9 @@ class _RegisterPageState extends State<RegisterPage> {
                               color: AppColors.grey,
                             ),
                             children: [
-                              const TextSpan(text: 'Already have an account? '),
+                              const TextSpan(text: 'Đã có tài khoản? '),
                               TextSpan(
-                                text: 'Sign In',
+                                text: 'Đăng nhập',
                                 style: AppTextStyles.bodyMedium.copyWith(
                                   color: AppColors.accent,
                                   fontWeight: FontWeight.w600,
@@ -376,7 +335,6 @@ class _RegisterPageState extends State<RegisterPage> {
                         ),
                       ),
                     ),
-
                     const SizedBox(height: 20),
                   ],
                 ),

@@ -155,36 +155,36 @@ class _MainLayoutState extends State<MainLayout> {
         child: SafeArea(
           child: Container(
             height: 79,
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Flexible(
                   child: _buildNavItem(
                     icon: Icons.home_rounded,
-                    label: 'Home',
+                    label: 'Trang chủ',
                     index: 0,
                   ),
                 ),
                 Flexible(
                   child: _buildNavItem(
                     icon: Icons.gavel_rounded,
-                    label: 'Auctions',
+                    label: 'Hoạt động',
                     index: 1,
                   ),
                 ),
-                const SizedBox(width: 64), // Space for floating button
+                const SizedBox(width: 56), // Space for floating button
                 Flexible(
                   child: _buildNavItem(
                     icon: Icons.account_balance_wallet_rounded,
-                    label: 'Wallet',
+                    label: 'Ví tiền',
                     index: 3,
                   ),
                 ),
                 Flexible(
                   child: _buildNavItem(
                     icon: Icons.person_rounded,
-                    label: 'Profile',
+                    label: 'Cá nhân',
                     index: 4,
                   ),
                 ),
@@ -207,7 +207,7 @@ class _MainLayoutState extends State<MainLayout> {
       onTap: () => _onTabTapped(index),
       behavior: HitTestBehavior.opaque,
       child: Container(
-        width: 60,
+        constraints: const BoxConstraints(minWidth: 52, maxWidth: 68),
         padding: const EdgeInsets.symmetric(vertical: 8),
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -221,10 +221,13 @@ class _MainLayoutState extends State<MainLayout> {
             Text(
               label,
               style: TextStyle(
-                fontSize: 11,
+                fontSize: 10,
                 fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
                 color: isSelected ? AppColors.accent : AppColors.grey,
               ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.center,
             ),
           ],
         ),

@@ -42,7 +42,7 @@ class _MyActivityPageState extends State<MyActivityPage>
     return Scaffold(
       backgroundColor: AppColors.white,
       appBar: CustomAppBar(
-        title: 'My Activity',
+        title: 'Hoạt động của tôi',
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios_new, size: 20),
           color: AppColors.accent,
@@ -95,7 +95,7 @@ class _MyActivityPageState extends State<MyActivityPage>
                       children: [
                         Icon(Icons.gavel, size: 18),
                         SizedBox(width: 8),
-                        Text('My Bids'),
+                        Flexible(child: Text('Giá đã đặt', overflow: TextOverflow.ellipsis)),
                       ],
                     ),
                   ),
@@ -106,7 +106,7 @@ class _MyActivityPageState extends State<MyActivityPage>
                       children: [
                         Icon(Icons.history, size: 18),
                         SizedBox(width: 8),
-                        Text('My Auctions'),
+                        Flexible(child: Text('Phiên của tôi', overflow: TextOverflow.ellipsis)),
                       ],
                     ),
                   ),

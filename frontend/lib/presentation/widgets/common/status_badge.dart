@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:frontend/core/utils/app_localizations.dart';
 import '../../../config/theme/app_text_styles.dart';
 
 class StatusBadge extends StatelessWidget {
@@ -120,7 +121,7 @@ class StatusBadge extends StatelessWidget {
         );
       default:
         return _StatusConfig(
-          label: status,
+          label: AppLocalizations.translateStatus(status),
           backgroundColor: const Color(0xFF9E9E9E).withOpacity(0.95), // Grey
           borderColor: const Color(0xFF757575),
           textColor: Colors.white,

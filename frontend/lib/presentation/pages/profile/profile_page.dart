@@ -136,17 +136,21 @@ class _ProfilePageState extends State<ProfilePage> {
                                 size: 16,
                                 color: AppColors.accent,
                               ),
-                              SizedBox(width: 4),
-                              Text(
-                                [
-                                  user.ward,
-                                  user.district,
-                                  user.city,
-                                ].whereType<String>().join(', '),
-                                style: AppTextStyles.bodySmall.copyWith(
-                                  color: AppColors.grey,
+                              const SizedBox(width: 4),
+                              Flexible(
+                                child: Text(
+                                  [
+                                    user.ward,
+                                    user.district,
+                                    user.city,
+                                  ].whereType<String>().join(', '),
+                                  style: AppTextStyles.bodySmall.copyWith(
+                                    color: AppColors.grey,
+                                  ),
+                                  textAlign: TextAlign.center,
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
                                 ),
-                                textAlign: TextAlign.center,
                               ),
                             ],
                           ),
@@ -158,7 +162,7 @@ class _ProfilePageState extends State<ProfilePage> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              'About',
+                              'Giới thiệu',
                               style: AppTextStyles.h4.copyWith(
                                 fontWeight: FontWeight.bold,
                               ),
@@ -169,7 +173,7 @@ class _ProfilePageState extends State<ProfilePage> {
                                   ? user.bio!
                                   : user.fullName.isNotEmpty
                                   ? user.fullName
-                                  : 'No bio available',
+                                  : 'Chưa có mô tả',
                               maxLines: 3,
                               style: AppTextStyles.bodyMedium.copyWith(
                                 height: 1.5,
@@ -192,7 +196,7 @@ class _ProfilePageState extends State<ProfilePage> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              'Statistics',
+                              'Thống kê',
                               style: AppTextStyles.h4.copyWith(
                                 fontWeight: FontWeight.bold,
                               ),
@@ -202,29 +206,29 @@ class _ProfilePageState extends State<ProfilePage> {
                               crossAxisCount: 2,
                               shrinkWrap: true,
                               physics: const NeverScrollableScrollPhysics(),
-                              childAspectRatio: 1.4,
+                              childAspectRatio: 1.15,
                               mainAxisSpacing: 12,
                               crossAxisSpacing: 12,
                               children: [
                                 _buildStat(
                                   Icons.gavel_rounded,
                                   '${_stats?['auctions'] ?? 0}',
-                                  'Auctions',
+                                  'Phiên đấu giá',
                                 ),
                                 _buildStat(
                                   Icons.local_offer_rounded,
                                   '${_stats?['bids'] ?? 0}',
-                                  'Bids',
+                                  'Lượt đặt giá',
                                 ),
                                 _buildStat(
                                   Icons.emoji_events_rounded,
                                   '${_stats?['wins'] ?? 0}',
-                                  'Won',
+                                  'Đã thắng',
                                 ),
                                 _buildStat(
                                   Icons.percent_rounded,
                                   '${_stats?['successRate'] ?? 0}%',
-                                  'Success',
+                                  'Tỷ lệ',
                                 ),
                               ],
                             ),
@@ -235,7 +239,7 @@ class _ProfilePageState extends State<ProfilePage> {
                       Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 24),
                         child: SecondaryButton(
-                          title: 'Logout Account',
+                          title: 'Đăng xuất',
                           icon: Icons.logout,
                           onPress: () => _showLogoutConfirmDialog(context),
                         ),
@@ -260,18 +264,18 @@ class _ProfilePageState extends State<ProfilePage> {
       builder: (BuildContext ctx) {
         return AlertDialog(
           title: Text(
-            'Logout',
+            'Đăng xuất',
             style: AppTextStyles.h3.copyWith(fontWeight: FontWeight.bold),
           ),
           content: Text(
-            'Are you sure you want to logout?',
+            'Bạn có chắc chắn muốn đăng xuất không?',
             style: AppTextStyles.bodyMedium,
           ),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(ctx),
               child: Text(
-                'Cancel',
+                'Hủy',
                 style: AppTextStyles.bodyMedium.copyWith(color: AppColors.grey),
               ),
             ),
@@ -281,7 +285,7 @@ class _ProfilePageState extends State<ProfilePage> {
                 context.read<AuthBloc>().add(const AuthLogoutEvent());
               },
               child: Text(
-                'Logout',
+                'Đăng xuất',
                 style: AppTextStyles.bodyMedium.copyWith(
                   color: AppColors.error,
                   fontWeight: FontWeight.bold,
@@ -296,7 +300,7 @@ class _ProfilePageState extends State<ProfilePage> {
 
   Widget _buildStat(IconData icon, String value, String label) {
     return Container(
-      padding: const EdgeInsets.symmetric(vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
       decoration: BoxDecoration(
         color: AppColors.greyLight,
         borderRadius: BorderRadius.circular(16),
@@ -305,27 +309,35 @@ class _ProfilePageState extends State<ProfilePage> {
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Container(
-            padding: const EdgeInsets.all(10),
+            padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
               color: AppColors.white,
               shape: BoxShape.circle,
             ),
-            child: Icon(icon, size: 28, color: AppColors.accent),
+            child: Icon(icon, size: 24, color: AppColors.accent),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 8),
           Text(
             value,
             style: AppTextStyles.h3.copyWith(
               fontWeight: FontWeight.bold,
               color: AppColors.accent,
             ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
           ),
-          const SizedBox(height: 6),
-          Text(
-            label,
-            style: AppTextStyles.bodySmall.copyWith(
-              color: AppColors.grey,
-              fontWeight: FontWeight.w500,
+          const SizedBox(height: 4),
+          Flexible(
+            child: Text(
+              label,
+              style: AppTextStyles.bodySmall.copyWith(
+                color: AppColors.grey,
+                fontWeight: FontWeight.w500,
+                fontSize: 11,
+              ),
+              textAlign: TextAlign.center,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
             ),
           ),
         ],

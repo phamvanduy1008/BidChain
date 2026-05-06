@@ -45,7 +45,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
 
     result.fold(
       (failure) => emit(AuthErrorState(message: failure.message)),
-      (user) => emit(AuthSuccessState(user: user, message: 'Login successful')),
+      (user) => emit(AuthSuccessState(user: user, message: 'Đăng nhập thành công')),
     );
   }
 
@@ -66,7 +66,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     result.fold(
       (failure) => emit(AuthErrorState(message: failure.message)),
       (user) => emit(
-        AuthSuccessState(user: user, message: 'Registration successful'),
+        AuthSuccessState(user: user, message: 'Đăng ký thành công'),
       ),
     );
   }
@@ -86,12 +86,12 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
 
       // Fetch latest user profile from API
       final updatedUser = await userRepository.getUserProfile();
-      emit(AuthSuccessState(user: updatedUser, message: 'Profile refreshed'));
+      emit(AuthSuccessState(user: updatedUser, message: 'Đã cập nhật hồ sơ'));
     } catch (e) {
       // If refresh fails, keep current state
       if (state is AuthSuccessState) {
         emit(
-          AuthErrorState(message: 'Failed to refresh profile: ${e.toString()}'),
+          AuthErrorState(message: 'Không thể làm mới hồ sơ: ${e.toString()}'),
         );
       }
     }
@@ -102,7 +102,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     Emitter<AuthState> emit,
   ) async {
     if (state is AuthSuccessState) {
-      emit(AuthSuccessState(user: event.user, message: 'Profile updated'));
+      emit(AuthSuccessState(user: event.user, message: 'Đã cập nhật hồ sơ'));
     }
   }
 
@@ -133,7 +133,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
         emit(
           AuthSuccessState(
             user: currentUser,
-            message: 'Error: ${failure.message}',
+            message: failure.message,
           ),
         );
       },
@@ -141,7 +141,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
         emit(
           AuthSuccessState(
             user: updatedUser,
-            message: 'Profile updated successfully',
+            message: 'Cập nhật hồ sơ thành công',
           ),
         );
       },
@@ -165,7 +165,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
         emit(
           AuthSuccessState(
             user: currentState.user,
-            message: 'Error: ${failure.message}',
+            message: failure.message,
           ),
         );
       },
@@ -173,7 +173,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
         emit(
           AuthSuccessState(
             user: currentState.user,
-            message: 'Password changed successfully',
+            message: 'Đổi mật khẩu thành công',
           ),
         );
       },
@@ -195,14 +195,14 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
       emit(
         AuthSuccessState(
           user: currentState.user,
-          message: 'Avatar uploaded successfully',
+          message: 'Cập nhật ảnh đại diện thành công',
         ),
       );
     } catch (e) {
       emit(
         AuthSuccessState(
           user: currentState.user,
-          message: 'Error: ${e.toString()}',
+          message: e.toString(),
         ),
       );
     }

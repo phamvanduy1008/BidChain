@@ -38,14 +38,14 @@ class _CreateAuctionPageState extends State<CreateAuctionPage> {
 
     setState(() => _submitting = false);
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Auction created (simulated)')),
+      const SnackBar(content: Text('Đã tạo phiên đấu giá (mô phỏng)')),
     );
     context.go(AppRoutes.auctionList);
   }
 
   String? _validateNumber(String? v) {
-    if (v == null || v.trim().isEmpty) return 'Required';
-    if (double.tryParse(v) == null) return 'Invalid number';
+    if (v == null || v.trim().isEmpty) return 'Vui lòng nhập thông tin';
+    if (double.tryParse(v) == null) return 'Số không hợp lệ';
     return null;
   }
 
@@ -53,7 +53,7 @@ class _CreateAuctionPageState extends State<CreateAuctionPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: CustomAppBar(
-        title: 'Create Auction',
+        title: 'Tạo phiên đấu giá',
         leading: const CustomBackButton(),
       ),
       body: SingleChildScrollView(
@@ -62,11 +62,11 @@ class _CreateAuctionPageState extends State<CreateAuctionPage> {
           key: _formKey,
           child: Column(
             children: [
-              Text('Create new auction', style: AppTextStyles.h3),
+              Text('Tạo phiên đấu giá mới', style: AppTextStyles.h3),
               const SizedBox(height: 12),
               CustomTextField(
                 controller: _startingController,
-                label: 'Starting price (ETH)',
+                label: 'Giá khởi điểm (ETH)',
                 hint: '0.1',
                 keyboardType: const TextInputType.numberWithOptions(
                   decimal: true,
@@ -76,7 +76,7 @@ class _CreateAuctionPageState extends State<CreateAuctionPage> {
               const SizedBox(height: 12),
               CustomTextField(
                 controller: _durationController,
-                label: 'Duration (seconds)',
+                label: 'Thời lượng (giây)',
                 hint: '3600',
                 keyboardType: TextInputType.number,
                 validator: _validateNumber,
@@ -84,14 +84,14 @@ class _CreateAuctionPageState extends State<CreateAuctionPage> {
               const SizedBox(height: 12),
               CustomTextField(
                 controller: _metadataController,
-                label: 'Metadata URL (optional)',
+                label: 'Đường dẫn metadata (không bắt buộc)',
                 hint: 'https://ipfs.io/...',
                 validator: (v) => null,
                 keyboardType: TextInputType.url,
               ),
               const SizedBox(height: 20),
               CustomButton(
-                text: _submitting ? 'Creating...' : 'Create Auction',
+                text: _submitting ? 'Đang tạo...' : 'Tạo phiên đấu giá',
                 isLoading: _submitting,
                 onPressed: _submitting ? null : _submit,
               ),

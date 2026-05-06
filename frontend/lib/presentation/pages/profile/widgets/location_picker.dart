@@ -134,7 +134,7 @@ class _LocationPickerState extends State<LocationPicker> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'Country',
+                'Quốc gia',
                 style: AppTextStyles.bodyMedium.copyWith(
                   fontWeight: FontWeight.w600,
                 ),
@@ -210,7 +210,7 @@ class _LocationPickerState extends State<LocationPicker> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'City/Province',
+                  'Thành phố/Tỉnh',
                   style: AppTextStyles.bodyMedium.copyWith(
                     fontWeight: FontWeight.w600,
                   ),
@@ -293,7 +293,7 @@ class _LocationPickerState extends State<LocationPicker> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'District',
+                  'Quận/Huyện',
                   style: AppTextStyles.bodyMedium.copyWith(
                     fontWeight: FontWeight.w600,
                   ),
@@ -372,7 +372,7 @@ class _LocationPickerState extends State<LocationPicker> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'Address Detail (Optional)',
+                'Chi tiết địa chỉ',
                 style: AppTextStyles.bodyMedium.copyWith(
                   fontWeight: FontWeight.w600,
                 ),
@@ -382,7 +382,7 @@ class _LocationPickerState extends State<LocationPicker> {
                 controller: addressCtrl,
                 maxLines: 2,
                 decoration: InputDecoration(
-                  hintText: 'Enter detailed address...',
+                  hintText: 'Nhập địa chỉ chi tiết...',
                   contentPadding: const EdgeInsets.symmetric(
                     horizontal: 12,
                     vertical: 10,

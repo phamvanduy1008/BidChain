@@ -130,7 +130,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Text(
-                        'Change Password',
+                        'Đổi mật khẩu',
                         style: AppTextStyles.h3.copyWith(
                           fontWeight: FontWeight.bold,
                         ),
@@ -143,7 +143,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    'Update your password to keep your account secure',
+                    'Cập nhật mật khẩu để bảo vệ tài khoản của bạn',
                     style: AppTextStyles.bodyMedium.copyWith(
                       color: Colors.grey[600],
                     ),
@@ -165,10 +165,11 @@ class _EditProfilePageState extends State<EditProfilePage> {
   Widget build(BuildContext context) {
     return BlocListener<AuthBloc, AuthState>(
       listener: (context, state) {
-        if (state is AuthSuccessState && state.message.contains('updated')) {
+        if (state is AuthSuccessState &&
+            state.message == 'Cập nhật hồ sơ thành công') {
           Toast.show(
             context,
-            message: 'Profile updated!',
+            message: 'Cập nhật hồ sơ thành công',
             type: ToastType.success,
           );
           context.pop();
@@ -180,7 +181,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
         backgroundColor: AppColors.white,
         appBar: AppBar(
           title: Text(
-            'Edit Profile',
+            'Chỉnh sửa hồ sơ',
             style: AppTextStyles.h3.copyWith(fontWeight: FontWeight.bold),
           ),
           backgroundColor: AppColors.white,
@@ -196,38 +197,38 @@ class _EditProfilePageState extends State<EditProfilePage> {
           physics: const AlwaysScrollableScrollPhysics(),
           children: [
             Text(
-              'Profile Photo',
+              'Ảnh đại diện',
               style: AppTextStyles.h4.copyWith(fontWeight: FontWeight.bold),
             ),
             SizedBox(height: 12),
             AvatarPicker(),
             SizedBox(height: 32),
             Text(
-              'Personal Information',
+              'Thông tin cá nhân',
               style: AppTextStyles.h4.copyWith(fontWeight: FontWeight.bold),
             ),
             SizedBox(height: 16),
             FormInput(
-              label: 'Username',
+              label: 'Tên đăng nhập',
               value: _usernameCtrl.text,
               onChangeText: (v) {
                 _usernameCtrl.text = v;
                 if (_usernameErr.isNotEmpty) setState(() => _usernameErr = '');
               },
               error: _usernameErr,
-              hint: 'Username',
+              hint: 'Tên đăng nhập',
               prefixIcon: Icons.person_outline,
             ),
             SizedBox(height: 16),
             FormInput(
-              label: 'Full Name',
+              label: 'Họ và tên',
               value: _fullNameCtrl.text,
               onChangeText: (v) {
                 _fullNameCtrl.text = v;
                 if (_fullNameErr.isNotEmpty) setState(() => _fullNameErr = '');
               },
               error: _fullNameErr,
-              hint: 'Full name',
+              hint: 'Họ và tên',
               prefixIcon: Icons.badge_outlined,
             ),
             SizedBox(height: 16),
@@ -244,16 +245,16 @@ class _EditProfilePageState extends State<EditProfilePage> {
             ),
             SizedBox(height: 16),
             FormInput(
-              label: 'Phone Number',
+              label: 'Số điện thoại',
               value: _phoneCtrl.text,
               onChangeText: (v) => _phoneCtrl.text = v,
               error: _phoneErr,
-              hint: 'Phone',
+              hint: 'Số điện thoại',
               prefixIcon: Icons.phone_outlined,
             ),
             SizedBox(height: 32),
             Text(
-              'Location & Bio',
+              'Địa chỉ và giới thiệu',
               style: AppTextStyles.h4.copyWith(fontWeight: FontWeight.bold),
             ),
             SizedBox(height: 16),
@@ -297,7 +298,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
                   ),
                 ),
                 child: const Text(
-                  'Change Password',
+                  'Đổi mật khẩu',
                   style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w600,
@@ -307,7 +308,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
               ),
             ),
             SizedBox(height: 32),
-            PrimaryButton(title: 'Save Changes', onPress: _save),
+            PrimaryButton(title: 'Lưu thay đổi', onPress: _save),
             SizedBox(height: 40),
           ],
         ),

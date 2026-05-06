@@ -4,6 +4,7 @@ import 'package:frontend/config/routes/app_routes.dart';
 import 'package:go_router/go_router.dart';
 import '../../../config/theme/app_colors.dart';
 import '../../../config/theme/app_text_styles.dart';
+import '../../../core/utils/app_localizations.dart';
 import '../../bloc/auth/auth_bloc.dart';
 import '../../bloc/auth/auth_event.dart';
 import '../../bloc/auth/auth_state.dart';
@@ -52,7 +53,7 @@ class _AuctionDetailPageState extends State<AuctionDetailPage> {
         'id': widget.auctionId,
         'title': auction.title,
         'description': auction.description,
-        'category': auction.categoryId ?? 'N/A',
+        'category': auction.categoryId ?? 'Không rõ',
         'current_price': auction.currentPriceVnd,
         'start_price': auction.startPriceVnd,
         'step_price': auction.stepPriceVnd,
@@ -298,11 +299,15 @@ class _AuctionDetailPageState extends State<AuctionDetailPage> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   // Status Badge
-                  Row(
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       StatusBadge(status: auction.status),
-                      const Spacer(),
-                      CountdownTimer(endTime: auction.endTime),
+                      const SizedBox(height: 8),
+                      Align(
+                        alignment: Alignment.centerRight,
+                        child: CountdownTimer(endTime: auction.endTime),
+                      ),
                     ],
                   ),
 
@@ -367,7 +372,7 @@ class _AuctionDetailPageState extends State<AuctionDetailPage> {
                               borderRadius: BorderRadius.circular(6),
                             ),
                             child: Text(
-                              'OWNER',
+                              'CHỦ PHIÊN',
                               style: AppTextStyles.labelSmall.copyWith(
                                 color: Colors.white,
                                 fontWeight: FontWeight.bold,

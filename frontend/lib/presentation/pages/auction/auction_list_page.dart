@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../../../config/routes/app_routes.dart';
 import '../../../config/theme/app_colors.dart';
 import '../../../config/theme/app_text_styles.dart';
+import '../../../core/utils/app_localizations.dart';
 import '../../bloc/auction/auction_bloc.dart';
 import '../../bloc/auction/auction_event.dart';
 import '../../bloc/auction/auction_state.dart';
@@ -71,7 +72,7 @@ class _AuctionListPageState extends State<AuctionListPage> {
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 20),
                       child: Text(
-                        'Categories',
+                        'Danh mục',
                         style: AppTextStyles.h3.copyWith(
                           color: AppColors.black,
                           fontWeight: FontWeight.bold,
@@ -115,7 +116,7 @@ class _AuctionListPageState extends State<AuctionListPage> {
                                       RefreshAuctions(),
                                     );
                               },
-                              child: const Text('Retry'),
+                              child: const Text('Thử lại'),
                             ),
                           ],
                         ),
@@ -157,10 +158,10 @@ class _AuctionListPageState extends State<AuctionListPage> {
                               const SizedBox(height: 16),
                               Text(
                                 _searchQuery.isNotEmpty
-                                    ? 'No auctions found for "$_searchQuery"'
+                                    ? 'Không tìm thấy phiên đấu giá cho "$_searchQuery"'
                                     : _selectedCategoryId != null
-                                        ? 'No auctions found in this category'
-                                        : 'No active auctions found',
+                                        ? 'Không có phiên đấu giá nào trong danh mục này'
+                                        : 'Hiện chưa có phiên đấu giá đang diễn ra',
                                 textAlign: TextAlign.center,
                                 style: AppTextStyles.bodyMedium.copyWith(
                                   color: AppColors.grey,
@@ -225,7 +226,7 @@ class _AuctionListPageState extends State<AuctionListPage> {
   PreferredSizeWidget _buildAppBar() {
     return AppBar(
       title: Text(
-        'All Auctions',
+        'Tất cả phiên đấu giá',
         style: AppTextStyles.h2.copyWith(
           color: AppColors.black,
           fontWeight: FontWeight.bold,
@@ -254,7 +255,7 @@ class _AuctionListPageState extends State<AuctionListPage> {
       child: TextField(
         controller: _searchController,
         decoration: InputDecoration(
-          hintText: 'Search auctions...',
+          hintText: 'Tìm kiếm phiên đấu giá...',
           hintStyle: AppTextStyles.bodyMedium.copyWith(color: AppColors.grey),
           prefixIcon: const Icon(Icons.search, color: AppColors.black),
           suffixIcon: _searchQuery.isNotEmpty
@@ -281,7 +282,7 @@ class _AuctionListPageState extends State<AuctionListPage> {
         if (state is CategoryLoaded) {
           // Add "All" category at the beginning
           final allCategories = [
-            {'id': null, 'name': 'All', 'icon': Icons.apps},
+            {'id': null, 'name': 'Tất cả', 'icon': Icons.apps},
             ...state.categories.map(
               (cat) => {
                 'id': cat.id,
@@ -333,7 +334,7 @@ class _AuctionListPageState extends State<AuctionListPage> {
               padding: const EdgeInsets.symmetric(horizontal: 20),
               children: [
                 CategoryChip(
-                  label: 'All',
+                  label: 'Tất cả',
                   icon: Icons.apps,
                   isSelected: _selectedCategoryId == null,
                   onTap: () {
@@ -391,19 +392,7 @@ class _AuctionListPageState extends State<AuctionListPage> {
     final difference = endTime.difference(now);
 
     if (difference.isNegative) {
-      return 'Ended';
     }
-
-    if (difference.inDays > 0) {
-      final hours = difference.inHours % 24;
-      return '${difference.inDays}d ${hours}h';
-    } else if (difference.inHours > 0) {
-      final minutes = difference.inMinutes % 60;
-      return '${difference.inHours}h ${minutes}m';
-    } else if (difference.inMinutes > 0) {
-      return '${difference.inMinutes}m';
-    } else {
-      return '${difference.inSeconds}s';
-    }
+    return AppLocalizations.formatTimeLeft(endTime);
   }
 }
