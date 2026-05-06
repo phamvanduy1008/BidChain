@@ -2,14 +2,14 @@ class Validators {
   // Email validation với regex RFC 5322 compliant
   static String? validateEmail(String? value) {
     if (value == null || value.isEmpty) {
-      return 'Email is required';
+      return 'Vui lòng nhập email';
     }
 
     // Trim whitespace
     final trimmedValue = value.trim();
 
     if (trimmedValue.isEmpty) {
-      return 'Email cannot be empty or whitespace';
+      return 'Email không được để trống';
     }
 
     // Email regex pattern (RFC 5322 simplified)
@@ -18,23 +18,23 @@ class Validators {
     );
 
     if (!emailRegex.hasMatch(trimmedValue)) {
-      return 'Please enter a valid email address';
+      return 'Vui lòng nhập đúng định dạng email';
     }
 
     // Check for consecutive dots
     if (trimmedValue.contains('..')) {
-      return 'Email cannot contain consecutive dots';
+      return 'Email không được chứa hai dấu chấm liên tiếp';
     }
 
     // Check email length (max 254 characters per RFC 5321)
     if (trimmedValue.length > 254) {
-      return 'Email is too long (max 254 characters)';
+      return 'Email quá dài (tối đa 254 ký tự)';
     }
 
     // Check local part length (before @)
     final localPart = trimmedValue.split('@')[0];
     if (localPart.length > 64) {
-      return 'Email local part is too long (max 64 characters)';
+      return 'Phần tên email quá dài (tối đa 64 ký tự)';
     }
 
     return null;
@@ -43,27 +43,27 @@ class Validators {
   // Username validation
   static String? validateUsername(String? value) {
     if (value == null || value.isEmpty) {
-      return 'Username is required';
+      return 'Vui lòng nhập tên đăng nhập';
     }
 
     final trimmedValue = value.trim();
 
     if (trimmedValue.isEmpty) {
-      return 'Username cannot be empty or whitespace';
+      return 'Tên đăng nhập không được để trống';
     }
 
     if (trimmedValue.length < 3) {
-      return 'Username must be at least 3 characters';
+      return 'Tên đăng nhập phải có ít nhất 3 ký tự';
     }
 
     if (trimmedValue.length > 30) {
-      return 'Username must not exceed 30 characters';
+      return 'Tên đăng nhập không được vượt quá 30 ký tự';
     }
 
     // Only allow alphanumeric, underscore, and hyphen
     final usernameRegex = RegExp(r'^[a-zA-Z0-9_-]+$');
     if (!usernameRegex.hasMatch(trimmedValue)) {
-      return 'Username can only contain letters, numbers, _ and -';
+      return 'Tên đăng nhập chỉ được gồm chữ, số, _ và -';
     }
 
     // Cannot start or end with special characters
@@ -71,7 +71,7 @@ class Validators {
         trimmedValue.startsWith('-') ||
         trimmedValue.endsWith('_') ||
         trimmedValue.endsWith('-')) {
-      return 'Username cannot start or end with _ or -';
+      return 'Tên đăng nhập không được bắt đầu hoặc kết thúc bằng _ hoặc -';
     }
 
     return null;
@@ -80,35 +80,35 @@ class Validators {
   // Password validation với multiple security rules
   static String? validatePassword(String? value) {
     if (value == null || value.isEmpty) {
-      return 'Password is required';
+      return 'Vui lòng nhập mật khẩu';
     }
 
     if (value.length < 8) {
-      return 'Password must be at least 8 characters';
+      return 'Mật khẩu phải có ít nhất 8 ký tự';
     }
 
     if (value.length > 128) {
-      return 'Password must not exceed 128 characters';
+      return 'Mật khẩu không được vượt quá 128 ký tự';
     }
 
     // Check for at least one uppercase letter
     if (!value.contains(RegExp(r'[A-Z]'))) {
-      return 'Password must contain at least one uppercase letter';
+      return 'Mật khẩu phải có ít nhất 1 chữ in hoa';
     }
 
     // Check for at least one lowercase letter
     if (!value.contains(RegExp(r'[a-z]'))) {
-      return 'Password must contain at least one lowercase letter';
+      return 'Mật khẩu phải có ít nhất 1 chữ thường';
     }
 
     // Check for at least one digit
     if (!value.contains(RegExp(r'[0-9]'))) {
-      return 'Password must contain at least one number';
+      return 'Mật khẩu phải có ít nhất 1 chữ số';
     }
 
     // Check for at least one special character
     if (!value.contains(RegExp(r'[!@#$%^&*(),.?":{}|<>]'))) {
-      return 'Password must contain at least one special character';
+      return 'Mật khẩu phải có ít nhất 1 ký tự đặc biệt';
     }
 
     // Check for common weak passwords
@@ -125,7 +125,7 @@ class Validators {
     if (weakPasswords.any(
       (weak) => value.toLowerCase().contains(weak.toLowerCase()),
     )) {
-      return 'Password is too common, please use a stronger password';
+      return 'Mật khẩu quá phổ biến, vui lòng chọn mật khẩu mạnh hơn';
     }
 
     return null;
@@ -134,11 +134,11 @@ class Validators {
   // Simple password validation (for login only)
   static String? validateLoginPassword(String? value) {
     if (value == null || value.isEmpty) {
-      return 'Password is required';
+      return 'Vui lòng nhập mật khẩu';
     }
 
     if (value.length < 6) {
-      return 'Password must be at least 6 characters';
+      return 'Mật khẩu phải có ít nhất 6 ký tự';
     }
 
     return null;
@@ -147,11 +147,11 @@ class Validators {
   // Confirm password validation
   static String? validateConfirmPassword(String? value, String? password) {
     if (value == null || value.isEmpty) {
-      return 'Please confirm your password';
+      return 'Vui lòng nhập lại mật khẩu';
     }
 
     if (value != password) {
-      return 'Passwords do not match';
+      return 'Mật khẩu xác nhận không khớp';
     }
 
     return null;
@@ -159,65 +159,65 @@ class Validators {
 
   static String? validateEthereumAddress(String? value) {
     if (value == null || value.isEmpty) {
-      return 'Address is required';
+      return 'Vui lòng nhập địa chỉ ví';
     }
     if (!value.startsWith('0x') || value.length != 42) {
-      return 'Invalid Ethereum address';
+      return 'Địa chỉ ví Ethereum không hợp lệ';
     }
     return null;
   }
 
   static String? validateAmount(String? value) {
     if (value == null || value.isEmpty) {
-      return 'Amount is required';
+      return 'Vui lòng nhập số tiền';
     }
     try {
       double.parse(value);
       return null;
     } catch (e) {
-      return 'Invalid amount';
+      return 'Số tiền không hợp lệ';
     }
   }
 
   // Full name validation
   static String? validateFullName(String? value) {
     if (value == null || value.isEmpty) {
-      return 'Full name is required';
+      return 'Vui lòng nhập họ và tên';
     }
 
     final trimmedValue = value.trim();
 
     if (trimmedValue.isEmpty) {
-      return 'Full name cannot be empty or whitespace';
+      return 'Họ và tên không được để trống';
     }
 
     if (trimmedValue.length < 2) {
-      return 'Full name must be at least 2 characters';
+      return 'Họ và tên phải có ít nhất 2 ký tự';
     }
 
     if (trimmedValue.length > 100) {
-      return 'Full name must not exceed 100 characters';
+      return 'Họ và tên không được vượt quá 100 ký tự';
     }
 
     // Only allow letters, spaces, and some special characters (apostrophe, hyphen)
     final nameRegex = RegExp(r"^[a-zA-ZÀ-ỹ\s'\-]+$");
     if (!nameRegex.hasMatch(trimmedValue)) {
-      return 'Full name can only contain letters, spaces, apostrophes, and hyphens';
+      return 'Họ và tên chỉ được chứa chữ cái, khoảng trắng, dấu nháy và dấu gạch nối';
     }
 
     // Check for at least one letter
     if (!trimmedValue.contains(RegExp(r'[a-zA-ZÀ-ỹ]'))) {
-      return 'Full name must contain at least one letter';
+      return 'Họ và tên phải chứa ít nhất một chữ cái';
     }
 
     // Cannot start or end with space
     if (trimmedValue.startsWith(' ') || trimmedValue.endsWith(' ')) {
-      return 'Full name cannot start or end with space';
+      return 'Họ và tên không được bắt đầu hoặc kết thúc bằng khoảng trắng';
     }
 
     // Cannot have consecutive spaces
     if (trimmedValue.contains(RegExp(r'\s{2,}'))) {
-      return 'Full name cannot contain consecutive spaces';
+      return 'Họ và tên không được chứa nhiều khoảng trắng liên tiếp';
     }
 
     return null;
@@ -226,13 +226,13 @@ class Validators {
   // Phone number validation (international format)
   static String? validatePhoneNumber(String? value) {
     if (value == null || value.isEmpty) {
-      return 'Phone number is required';
+      return 'Vui lòng nhập số điện thoại';
     }
 
     final trimmedValue = value.trim();
 
     if (trimmedValue.isEmpty) {
-      return 'Phone number cannot be empty';
+      return 'Số điện thoại không được để trống';
     }
 
     // Remove common separators for validation
@@ -240,16 +240,16 @@ class Validators {
 
     // Check if contains only digits after removing separators
     if (!RegExp(r'^[0-9]+$').hasMatch(digitsOnly)) {
-      return 'Phone number can only contain digits and separators (+, -, (), spaces)';
+      return 'Số điện thoại chỉ được chứa chữ số và các ký tự phân tách hợp lệ';
     }
 
     // Check length (international phone numbers: 7-15 digits)
     if (digitsOnly.length < 7) {
-      return 'Phone number is too short (minimum 7 digits)';
+      return 'Số điện thoại quá ngắn (ít nhất 7 số)';
     }
 
     if (digitsOnly.length > 15) {
-      return 'Phone number is too long (maximum 15 digits)';
+      return 'Số điện thoại quá dài (tối đa 15 số)';
     }
 
     // Vietnam phone number specific validation (optional, can be removed for international)
@@ -257,7 +257,7 @@ class Validators {
       // Vietnamese mobile numbers
       final vnMobileRegex = RegExp(r'^0(3|5|7|8|9)[0-9]{8}$');
       if (!vnMobileRegex.hasMatch(digitsOnly)) {
-        return 'Invalid Vietnamese phone number format';
+        return 'Số điện thoại Việt Nam không đúng định dạng';
       }
     }
 

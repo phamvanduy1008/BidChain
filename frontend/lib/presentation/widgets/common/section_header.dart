@@ -15,15 +15,19 @@ class SectionHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Text(
-          title,
-          style: AppTextStyles.h3.copyWith(
-            color: AppColors.black,
-            fontWeight: FontWeight.bold,
+        Expanded(
+          child: Text(
+            title,
+            style: AppTextStyles.h3.copyWith(
+              color: AppColors.black,
+              fontWeight: FontWeight.bold,
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
           ),
         ),
+        if (onSeeAllTap != null) const SizedBox(width: 12),
         if (onSeeAllTap != null)
           TextButton(
             onPressed: onSeeAllTap,
@@ -36,7 +40,7 @@ class SectionHeader extends StatelessWidget {
               mainAxisSize: MainAxisSize.min,
               children: [
                 Text(
-                  'See All',
+                  'Xem tất cả',
                   style: AppTextStyles.bodyMedium.copyWith(
                     color: AppColors.black,
                     fontWeight: FontWeight.w600,

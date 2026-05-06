@@ -89,12 +89,15 @@ class _CreateAuctionViewState extends State<_CreateAuctionView> {
             return _buildBody(isLoading);
           },
         ),
-        bottomNavigationBar: Padding(
-          padding: const EdgeInsets.fromLTRB(20, 0, 20, 30),
-          child: CustomButton(
-            color: AppColors.accent,
-            text: 'Submit Art Auction',
-            onPressed: _submitAuction,
+        bottomNavigationBar: SafeArea(
+          top: false,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
+            child: CustomButton(
+              color: AppColors.accent,
+              text: 'Đăng phiên đấu giá',
+              onPressed: _submitAuction,
+            ),
           ),
         ),
       ),
@@ -120,9 +123,9 @@ class _CreateAuctionViewState extends State<_CreateAuctionView> {
         _imageUrls.addAll(state.imageUrls);
         _isUploading = false;
       });
-      _showSnackBar(context, 'Images uploaded successfully!');
+      _showSnackBar(context, 'Tải ảnh lên thành công');
     } else if (state is CreateAuctionSuccess) {
-      _showSnackBar(context, 'Auction created successfully!');
+      _showSnackBar(context, 'Tạo phiên đấu giá thành công');
       context.pop();
     } else if (state is CreateAuctionFailure) {
       setState(() {
@@ -141,7 +144,7 @@ class _CreateAuctionViewState extends State<_CreateAuctionView> {
   PreferredSizeWidget _buildAppBar(BuildContext context) {
     return AppBar(
       title: const Text(
-        'Create Auction',
+        'Tạo phiên đấu giá',
         style: TextStyle(
           color: AppColors.black,
           fontSize: 18,
@@ -169,35 +172,35 @@ class _CreateAuctionViewState extends State<_CreateAuctionView> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             _buildTextField(
-              label: 'Product Name',
+              label: 'Tên sản phẩm',
               controller: _titleController,
-              hint: 'Name of the product.',
+              hint: 'Nhập tên sản phẩm',
             ),
             const SizedBox(height: 20),
             _buildTextField(
-              label: 'Product Description',
+              label: 'Mô tả sản phẩm',
               controller: _descriptionController,
-              hint: 'Detail infomation of product.',
+              hint: 'Nhập mô tả chi tiết sản phẩm',
             ),
             const SizedBox(height: 20),
-            _buildLabel('Category'),
+            _buildLabel('Danh mục'),
             _buildCategoryDropdown(),
             const SizedBox(height: 20),
             _buildTextField(
-              label: 'Minimum Bid',
+              label: 'Giá khởi điểm',
               controller: _startPriceController,
-              hint: '100.000 VND',
+              hint: '100000',
               keyboardType: TextInputType.number,
             ),
             const SizedBox(height: 20),
             _buildTextField(
-              label: 'Step Bid',
+              label: 'Bước giá',
               controller: _stepPriceController,
-              hint: '500.000 VND',
+              hint: '500000',
               keyboardType: TextInputType.number,
             ),
             const SizedBox(height: 20),
-            _buildLabel('End Time'),
+            _buildLabel('Thời gian kết thúc'),
             _buildDatePicker(context),
             const SizedBox(height: 20),
             if (_selectedImages.isEmpty) _buildImageUploadPlaceholder(),
@@ -264,7 +267,7 @@ class _CreateAuctionViewState extends State<_CreateAuctionView> {
             value: _selectedCategoryId,
             isExpanded: true,
             hint: Text(
-              'Select Category',
+              'Chọn danh mục',
               style: TextStyle(color: AppColors.grey, fontSize: 14),
             ),
             icon: const Icon(Icons.keyboard_arrow_down),
@@ -299,7 +302,7 @@ class _CreateAuctionViewState extends State<_CreateAuctionView> {
             Text(
               _endTime != null
                   ? DateFormat('yyyy-MM-dd HH:mm').format(_endTime!)
-                  : 'Select Date & Time',
+                  : 'Chọn ngày và giờ',
               style: TextStyle(
                 fontSize: 14,
                 color: _endTime != null ? AppColors.black : AppColors.grey,
@@ -365,7 +368,7 @@ class _CreateAuctionViewState extends State<_CreateAuctionView> {
             ),
             const SizedBox(height: 12),
             const Text(
-              'Upload an image',
+              'Tải ảnh lên',
               style: TextStyle(
                 fontSize: 14,
                 fontWeight: FontWeight.w600,
@@ -394,7 +397,7 @@ class _CreateAuctionViewState extends State<_CreateAuctionView> {
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
         Text(
-          '${_selectedImages.length} image(s) selected',
+          'Đã chọn ${_selectedImages.length} ảnh',
           style: const TextStyle(
             fontSize: 14,
             fontWeight: FontWeight.w600,
@@ -404,7 +407,7 @@ class _CreateAuctionViewState extends State<_CreateAuctionView> {
         TextButton.icon(
           onPressed: _pickImages,
           icon: const Icon(Icons.add, size: 18),
-          label: const Text('Add More'),
+          label: const Text('Thêm ảnh'),
           style: TextButton.styleFrom(
             foregroundColor: AppColors.info,
             padding: const EdgeInsets.symmetric(horizontal: 8),
@@ -496,25 +499,25 @@ class _CreateAuctionViewState extends State<_CreateAuctionView> {
 
   bool _validateForm() {
     if (!_formKey.currentState!.validate()) {
-      _showSnackBar(context, 'Please fill all required fields');
+      _showSnackBar(context, 'Vui lòng nhập đầy đủ thông tin bắt buộc');
       return false;
     }
 
     if (_selectedCategoryId == null) {
-      _showSnackBar(context, 'Please select a category');
+      _showSnackBar(context, 'Vui lòng chọn danh mục');
       return false;
     }
 
     if (_endTime == null) {
-      _showSnackBar(context, 'Please select end time');
+      _showSnackBar(context, 'Vui lòng chọn thời gian kết thúc');
       return false;
     }
 
     if (_imageUrls.isEmpty) {
       if (_selectedImages.isNotEmpty && _isUploading) {
-        _showSnackBar(context, 'Please wait for images to upload');
+        _showSnackBar(context, 'Vui lòng chờ tải ảnh lên hoàn tất');
       } else {
-        _showSnackBar(context, 'Please upload at least one image');
+        _showSnackBar(context, 'Vui lòng tải lên ít nhất một ảnh');
       }
       return false;
     }

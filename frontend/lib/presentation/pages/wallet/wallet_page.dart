@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 
 import '../../../config/theme/app_colors.dart';
 import '../../../config/theme/app_text_styles.dart';
+import '../../../core/utils/app_localizations.dart';
 import '../../widgets/common/primary_button.dart';
 import '../../widgets/common/secondary_button.dart';
 import '../../widgets/common/form_input.dart';
@@ -85,7 +86,7 @@ class _WalletPageState extends State<WalletPage>
               backgroundColor: AppColors.secondary,
               appBar: AppBar(
                 title: Text(
-                  'My Wallet',
+                  'Ví của tôi',
                   style: AppTextStyles.h2.copyWith(color: AppColors.black),
                 ),
                 backgroundColor: AppColors.white,
@@ -119,7 +120,7 @@ class _WalletPageState extends State<WalletPage>
 
                       // Transaction History
                       Text(
-                        'Transaction History',
+                        'Lịch sử giao dịch',
                         style: AppTextStyles.h3.copyWith(
                           color: AppColors.black,
                         ),
@@ -158,15 +159,19 @@ class _WalletPageState extends State<WalletPage>
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Total Balance',
+            'Tổng số dư',
             style: AppTextStyles.bodyMedium.copyWith(
               color: AppColors.black.withOpacity(0.8),
             ),
           ),
           const SizedBox(height: 8),
-          Text(
-            formatVnd(ethToVnd(total)),
-            style: AppTextStyles.h1.copyWith(color: AppColors.black),
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
+            child: Text(
+              formatVnd(ethToVnd(total)),
+              style: AppTextStyles.h1.copyWith(color: AppColors.black),
+            ),
           ),
           const SizedBox(height: 24),
           Row(
@@ -176,15 +181,19 @@ class _WalletPageState extends State<WalletPage>
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Available',
+                      'Khả dụng',
                       style: AppTextStyles.labelSmall.copyWith(
                         color: AppColors.black.withOpacity(0.8),
                       ),
                     ),
                     const SizedBox(height: 4),
-                    Text(
-                      formatVnd(ethToVnd(available)),
-                      style: AppTextStyles.h4.copyWith(color: AppColors.black),
+                    FittedBox(
+                      fit: BoxFit.scaleDown,
+                      alignment: Alignment.centerLeft,
+                      child: Text(
+                        formatVnd(ethToVnd(available)),
+                        style: AppTextStyles.h4.copyWith(color: AppColors.black),
+                      ),
                     ),
                   ],
                 ),
@@ -200,15 +209,19 @@ class _WalletPageState extends State<WalletPage>
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Locked',
+                      'Đang khóa',
                       style: AppTextStyles.labelSmall.copyWith(
                         color: AppColors.black.withOpacity(0.8),
                       ),
                     ),
                     const SizedBox(height: 4),
-                    Text(
-                      formatVnd(ethToVnd(locked)),
-                      style: AppTextStyles.h4.copyWith(color: AppColors.black),
+                    FittedBox(
+                      fit: BoxFit.scaleDown,
+                      alignment: Alignment.centerLeft,
+                      child: Text(
+                        formatVnd(ethToVnd(locked)),
+                        style: AppTextStyles.h4.copyWith(color: AppColors.black),
+                      ),
                     ),
                   ],
                 ),
@@ -225,7 +238,7 @@ class _WalletPageState extends State<WalletPage>
       children: [
         Expanded(
           child: PrimaryButton(
-            title: 'Deposit',
+            title: 'Nạp tiền',
             icon: Icons.add_circle_outline,
             onPress: () => _showDepositModal(context),
           ),
@@ -233,7 +246,7 @@ class _WalletPageState extends State<WalletPage>
         const SizedBox(width: 16),
         Expanded(
           child: SecondaryButton(
-            title: 'Withdraw',
+            title: 'Rút tiền',
             icon: Icons.remove_circle_outline,
             onPress: () => _showWithdrawModal(context, availableEth),
           ),
@@ -264,8 +277,8 @@ class _WalletPageState extends State<WalletPage>
             unselectedLabelColor: AppColors.grey,
             indicatorColor: const Color.fromARGB(255, 63, 0, 0),
             tabs: const [
-              Tab(text: 'Deposits'),
-              Tab(text: 'Withdrawals'),
+              Tab(text: 'Nạp tiền'),
+              Tab(text: 'Rút tiền'),
             ],
           ),
           Expanded(
@@ -282,7 +295,7 @@ class _WalletPageState extends State<WalletPage>
                 } else if (state is PaymentLoading) {
                   return const Center(child: CircularProgressIndicator());
                 } else {
-                  return const Center(child: Text('No history loaded'));
+                  return const Center(child: Text('Chưa tải được lịch sử'));
                 }
               },
             ),
@@ -305,7 +318,7 @@ class _WalletPageState extends State<WalletPage>
             ),
             const SizedBox(height: 16),
             Text(
-              'No transactions yet',
+              'Chưa có giao dịch nào',
               style: AppTextStyles.bodyMedium.copyWith(color: AppColors.grey),
             ),
           ],
@@ -365,25 +378,37 @@ class _WalletPageState extends State<WalletPage>
           size: 20,
         ),
       ),
+      minLeadingWidth: 40,
       title: Text(
-        isDeposit ? 'Deposit' : 'Withdrawal',
+        AppLocalizations.translateTransactionType(isDeposit),
         style: AppTextStyles.bodyLarge.copyWith(fontWeight: FontWeight.w600),
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
       ),
       subtitle: Text(
         date != null
             ? DateFormat('dd/MM/yyyy HH:mm').format(date)
-            : 'Unknown date',
+            : 'Không rõ thời gian',
         style: AppTextStyles.labelSmall.copyWith(color: AppColors.grey),
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
       ),
       trailing: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         crossAxisAlignment: CrossAxisAlignment.end,
+        mainAxisSize: MainAxisSize.min,
         children: [
-          Text(
-            '${isDeposit ? '+' : '-'}${formatVnd(double.parse(amount.toString()))}',
-            style: AppTextStyles.bodyLarge.copyWith(
-              color: isDeposit ? AppColors.success : AppColors.black,
-              fontWeight: FontWeight.bold,
+          SizedBox(
+            width: 108,
+            child: Text(
+              '${isDeposit ? '+' : '-'}${formatVnd(double.parse(amount.toString()))}',
+              style: AppTextStyles.bodyLarge.copyWith(
+                color: isDeposit ? AppColors.success : AppColors.black,
+                fontWeight: FontWeight.bold,
+              ),
+              textAlign: TextAlign.right,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
             ),
           ),
           const SizedBox(height: 4),
@@ -394,12 +419,14 @@ class _WalletPageState extends State<WalletPage>
               borderRadius: BorderRadius.circular(12),
             ),
             child: Text(
-              status,
+              AppLocalizations.translateStatus(status),
               style: AppTextStyles.labelSmall.copyWith(
                 color: statusColor,
                 fontWeight: FontWeight.w600,
                 fontSize: 10,
               ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
             ),
           ),
         ],
@@ -436,21 +463,21 @@ class _WalletPageState extends State<WalletPage>
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Deposit Funds',
+                  'Nạp tiền vào ví',
                   style: AppTextStyles.h3.copyWith(color: AppColors.accent),
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  'Enter amount in VND to deposit via MoMo.',
+                  'Nhập số tiền VND cần nạp qua MoMo.',
                   style: AppTextStyles.bodyMedium.copyWith(
                     color: AppColors.grey,
                   ),
                 ),
                 const SizedBox(height: 20),
                 FormInput(
-                  label: 'Amount (VND)',
+                  label: 'Số tiền (VND)',
                   value: amount,
-                  hint: 'Min 10,000 VND',
+                  hint: 'Tối thiểu 10.000 VND',
                   keyboardType: TextInputType.number,
                   error: errorText,
                   prefixIcon: Icons.attach_money,
@@ -463,18 +490,18 @@ class _WalletPageState extends State<WalletPage>
                 ),
                 const SizedBox(height: 20),
                 PrimaryButton(
-                  title: 'Continue to Payment',
+                  title: 'Tiếp tục thanh toán',
                   onPress: () {
                     final amountVal = double.tryParse(amount) ?? 0;
                     if (amountVal < 10000) {
                       setModalState(
-                        () => errorText = 'Minimum deposit is 10,000 VND',
+                        () => errorText = 'Số tiền nạp tối thiểu là 10.000 VND',
                       );
                       return;
                     }
                     if (amountVal > 50000000) {
                       setModalState(
-                        () => errorText = 'Maximum deposit is 50,000,000 VND',
+                        () => errorText = 'Số tiền nạp tối đa là 50.000.000 VND',
                       );
                       return;
                     }
@@ -523,21 +550,21 @@ class _WalletPageState extends State<WalletPage>
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'Withdraw Funds',
+                    'Yêu cầu rút tiền',
                     style: AppTextStyles.h3.copyWith(color: AppColors.accent),
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    'Available: ${availableEth.toStringAsFixed(4)} ETH',
+                    'Số dư khả dụng: ${availableEth.toStringAsFixed(4)} ETH',
                     style: AppTextStyles.bodyMedium.copyWith(
                       color: AppColors.success,
                     ),
                   ),
                   const SizedBox(height: 20),
                   FormInput(
-                    label: 'Amount (VND)',
+                    label: 'Số tiền (VND)',
                     value: amount,
-                    hint: 'Min 50,000 VND',
+                    hint: 'Tối thiểu 50.000 VND',
                     keyboardType: TextInputType.number,
                     error: amountError,
                     prefixIcon: Icons.attach_money,
@@ -548,9 +575,9 @@ class _WalletPageState extends State<WalletPage>
                   ),
                   const SizedBox(height: 12),
                   FormInput(
-                    label: 'Bank Name',
+                    label: 'Tên ngân hàng',
                     value: bankName,
-                    hint: 'e.g. Vietcombank',
+                    hint: 'Ví dụ: Vietcombank',
                     error: bankError,
                     prefixIcon: Icons.account_balance,
                     onChangeText: (val) => setModalState(() {
@@ -560,9 +587,9 @@ class _WalletPageState extends State<WalletPage>
                   ),
                   const SizedBox(height: 12),
                   FormInput(
-                    label: 'Account Number',
+                    label: 'Số tài khoản',
                     value: accountNum,
-                    hint: 'e.g. 1234567890',
+                    hint: 'Ví dụ: 1234567890',
                     keyboardType: TextInputType.number,
                     error: numError,
                     prefixIcon: Icons.numbers,
@@ -573,9 +600,9 @@ class _WalletPageState extends State<WalletPage>
                   ),
                   const SizedBox(height: 12),
                   FormInput(
-                    label: 'Account Holder Name',
+                    label: 'Tên chủ tài khoản',
                     value: accountName,
-                    hint: 'e.g. NGUYEN VAN A',
+                    hint: 'Ví dụ: NGUYEN VAN A',
                     error: nameError,
                     prefixIcon: Icons.person,
                     onChangeText: (val) => setModalState(() {
@@ -585,31 +612,31 @@ class _WalletPageState extends State<WalletPage>
                   ),
                   const SizedBox(height: 20),
                   PrimaryButton(
-                    title: 'Submit Request',
+                    title: 'Gửi yêu cầu',
                     onPress: () {
                       bool isValid = true;
                       final amountVal = double.tryParse(amount) ?? 0;
                       if (amountVal < 50000) {
-                        setModalState(() => amountError = 'Min 50,000 VND');
+                        setModalState(() => amountError = 'Tối thiểu 50.000 VND');
                         isValid = false;
                       }
                       // Simple check: 1 ETH approx 50M VND (client side check only)
                       if ((amountVal / 50000000) > availableEth) {
                         setModalState(
-                          () => amountError = 'Insufficient balance (approx)',
+                          () => amountError = 'Số dư khả dụng không đủ',
                         );
                         isValid = false;
                       }
                       if (bankName.isEmpty) {
-                        setModalState(() => bankError = 'Required');
+                        setModalState(() => bankError = 'Vui lòng nhập');
                         isValid = false;
                       }
                       if (accountNum.isEmpty) {
-                        setModalState(() => numError = 'Required');
+                        setModalState(() => numError = 'Vui lòng nhập');
                         isValid = false;
                       }
                       if (accountName.isEmpty) {
-                        setModalState(() => nameError = 'Required');
+                        setModalState(() => nameError = 'Vui lòng nhập');
                         isValid = false;
                       }
 
@@ -644,7 +671,7 @@ class _WalletPageState extends State<WalletPage>
         backgroundColor: AppColors.white,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: Text(
-          'Payment Required',
+          'Yêu cầu thanh toán',
           style: AppTextStyles.h3.copyWith(color: AppColors.accent),
           textAlign: TextAlign.center,
         ),
@@ -652,7 +679,7 @@ class _WalletPageState extends State<WalletPage>
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text('Scan QR Code with MoMo', style: AppTextStyles.bodyLarge),
+              Text('Quét mã QR bằng MoMo', style: AppTextStyles.bodyLarge),
               const SizedBox(height: 16),
               Container(
                 width: 200,
@@ -671,16 +698,16 @@ class _WalletPageState extends State<WalletPage>
                           backgroundColor: Colors.white,
                         ),
                       )
-                    : const Center(child: Text('QR Error')),
+                    : const Center(child: Text('Không tạo được mã QR')),
               ),
               const SizedBox(height: 16),
               Text(
-                'Amount: ${formatVnd(state.amountVnd)}',
+                'Số tiền: ${formatVnd(state.amountVnd)}',
                 style: AppTextStyles.h4.copyWith(color: AppColors.accent),
               ),
               const SizedBox(height: 8),
               Text(
-                'System will automatically update your balance after payment.',
+                'Hệ thống sẽ tự động cập nhật số dư sau khi thanh toán.',
                 textAlign: TextAlign.center,
                 style: AppTextStyles.bodySmall.copyWith(color: AppColors.grey),
               ),
@@ -694,7 +721,7 @@ class _WalletPageState extends State<WalletPage>
               context.read<AuthBloc>().add(const AuthCheckStatusEvent());
               context.read<PaymentBloc>().add(LoadPaymentHistory());
             },
-            child: const Text('Close'),
+            child: const Text('Đóng'),
           ),
         ],
       ),

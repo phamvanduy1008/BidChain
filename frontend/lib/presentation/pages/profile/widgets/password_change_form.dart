@@ -42,11 +42,11 @@ class _PasswordChangeFormState extends State<PasswordChangeForm> {
 
   void _changePassword() {
     setState(() {
-      _currentErr = _currentCtrl.text.isEmpty ? 'Required' : '';
+      _currentErr = _currentCtrl.text.isEmpty ? 'Vui lòng nhập' : '';
       _newErr = _newCtrl.text.isEmpty
-          ? 'Required'
-          : (_newCtrl.text.length < 8 ? 'Min 8 chars' : '');
-      _confirmErr = _confirmCtrl.text != _newCtrl.text ? 'Must match' : '';
+          ? 'Vui lòng nhập'
+          : (_newCtrl.text.length < 8 ? 'Tối thiểu 8 ký tự' : '');
+      _confirmErr = _confirmCtrl.text != _newCtrl.text ? 'Mật khẩu không khớp' : '';
     });
 
     if (_currentErr.isEmpty && _newErr.isEmpty && _confirmErr.isEmpty) {
@@ -64,14 +64,14 @@ class _PasswordChangeFormState extends State<PasswordChangeForm> {
   Widget build(BuildContext context) {
     return BlocListener<AuthBloc, AuthState>(
       listener: (context, state) {
-        if (state is AuthSuccessState && state.message.contains('Password')) {
+        if (state is AuthSuccessState && state.message == 'Đổi mật khẩu thành công') {
           setState(() => _isLoading = false);
           _currentCtrl.clear();
           _newCtrl.clear();
           _confirmCtrl.clear();
           Toast.show(
             context,
-            message: 'Password changed!',
+            message: 'Đổi mật khẩu thành công',
             type: ToastType.success,
           );
         } else if (state is AuthErrorState) {
@@ -82,7 +82,7 @@ class _PasswordChangeFormState extends State<PasswordChangeForm> {
       child: Column(
         children: [
           FormInput(
-            label: 'Current Password',
+            label: 'Mật khẩu hiện tại',
             value: _currentCtrl.text,
             onChangeText: (v) {
               _currentCtrl.text = v;
@@ -94,7 +94,7 @@ class _PasswordChangeFormState extends State<PasswordChangeForm> {
           ),
           SizedBox(height: 16),
           FormInput(
-            label: 'New Password',
+            label: 'Mật khẩu mới',
             value: _newCtrl.text,
             onChangeText: (v) {
               _newCtrl.text = v;
@@ -106,7 +106,7 @@ class _PasswordChangeFormState extends State<PasswordChangeForm> {
           ),
           SizedBox(height: 16),
           FormInput(
-            label: 'Confirm Password',
+            label: 'Xác nhận mật khẩu mới',
             value: _confirmCtrl.text,
             onChangeText: (v) {
               _confirmCtrl.text = v;
@@ -118,7 +118,7 @@ class _PasswordChangeFormState extends State<PasswordChangeForm> {
           ),
           SizedBox(height: 24),
           PrimaryButton(
-            title: 'Change Password',
+            title: 'Đổi mật khẩu',
             loading: _isLoading,
             onPress: _changePassword,
           ),

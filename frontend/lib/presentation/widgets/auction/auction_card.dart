@@ -117,7 +117,6 @@ class AuctionCard extends StatelessWidget {
 
                       // Price & Bids Row
                       Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           Expanded(
                             child: Column(
@@ -145,9 +144,11 @@ class AuctionCard extends StatelessWidget {
                               ],
                             ),
                           ),
+                          const SizedBox(width: 8),
                           Container(
+                            constraints: const BoxConstraints(maxWidth: 72),
                             padding: const EdgeInsets.symmetric(
-                              horizontal: 8,
+                              horizontal: 6,
                               vertical: 4,
                             ),
                             decoration: BoxDecoration(
@@ -159,12 +160,14 @@ class AuctionCard extends StatelessWidget {
                               ),
                             ),
                             child: Text(
-                              '$bidCount bids',
+                              '$bidCount giá',
                               style: AppTextStyles.bodySmall.copyWith(
                                 color: AppColors.black,
                                 fontWeight: FontWeight.w600,
                                 fontSize: 11,
                               ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
                             ),
                           ),
                         ],
