@@ -1,78 +1,118 @@
-
-
 const ethers = require("ethers");
 require("dotenv").config();
 
-// ethers v5 syntax
-const provider = new ethers.providers.JsonRpcProvider(
-    process.env.RPC_URL || "http://127.0.0.1:7545"
-);
+const RPC_URL = process.env.RPC_URL || process.env.GANACHE_RPC || "http://127.0.0.1:7545";
 
-const wallet = new ethers.Wallet(
-    process.env.DEPLOYER_PRIVATE_KEY,
-    provider
-);
+const provider = new ethers.providers.JsonRpcProvider(RPC_URL);
 
-// Đọc artifact từ Hardhat
-// src/blockchain/deploy.js - ĐÃ SỬA ĐÚNG
+if (!process.env.DEPLOYER_PRIVATE_KEY) {
+    throw new Error("Missing DEPLOYER_PRIVATE_KEY in backend .env");
+}
+
+const wallet = new ethers.Wallet(process.env.DEPLOYER_PRIVATE_KEY, provider);
+
 const AUCTION_ARTIFACT = require("../../../blockchain/artifacts/contracts/Auction.sol/Auction.json");
 const AUCTION_ABI = AUCTION_ARTIFACT.abi;
 const AUCTION_BYTECODE = AUCTION_ARTIFACT.bytecode;
 
+function unixSecondsToDate(unixSeconds) {
+    return new Date(Number(unixSeconds) * 1000);
+}
 
 async function deployAuctionContract(auctionData) {
     try {
-        console.log("Bắt đầu deploy contract Auction (ethers v5)...");
+        console.log("Starting Auction contract deployment...");
+        console.log("RPC URL:", RPC_URL);
 
-        // Tạo factory
-        const AuctionFactory = new ethers.ContractFactory(AUCTION_ABI, AUCTION_BYTECODE, wallet);
-
-        // Deploy contract
-        const contract = await AuctionFactory.deploy();
-        console.log("Đang deploy... tx:", contract.deployTransaction.hash);
-
-        // Chờ deploy xong
-        await contract.deployed(); // ← ethers v5
-
-        const contractAddress = contract.address;
-        console.log("Contract deployed tại:", contractAddress);
-
-        // Tính duration
-        const durationSeconds = Math.floor(
-            (new Date(auctionData.end_time) - Date.now()) / 1000
-        );
-
-        if (durationSeconds < 300) {
-            throw new Error("Thời gian đấu giá phải ≥ 5 phút");
+        try {
+            const network = await provider.getNetwork();
+            console.log(`Connected blockchain network: chainId=${network.chainId}, name=${network.name}`);
+        } catch (networkError) {
+            throw new Error(
+                `Cannot connect to blockchain RPC ${RPC_URL}. ` +
+                `Start Ganache/Hardhat on this URL or update GANACHE_RPC/RPC_URL in backend .env. ` +
+                `Original error: ${networkError.message}`
+            );
         }
 
-        console.log(`Tạo auction trên chain (duration: ${durationSeconds}s)...`);
+        const auctionFactory = new ethers.ContractFactory(
+            AUCTION_ABI,
+            AUCTION_BYTECODE,
+            wallet
+        );
+
+        const contract = await auctionFactory.deploy();
+        console.log("Deploy tx:", contract.deployTransaction.hash);
+
+        await contract.deployed();
+
+        const contractAddress = contract.address;
+        console.log("Contract deployed at:", contractAddress);
+
+        const requestedStartTimeMs = new Date(auctionData.start_time).getTime();
+        const requestedEndTimeMs = new Date(auctionData.end_time).getTime();
+        if (Number.isNaN(requestedStartTimeMs) || Number.isNaN(requestedEndTimeMs)) {
+            throw new Error("Invalid auction start_time or end_time");
+        }
+
+        const requestedStartTimeSeconds = Math.floor(requestedStartTimeMs / 1000);
+        const requestedEndTimeSeconds = Math.floor(requestedEndTimeMs / 1000);
+        const latestBlock = await provider.getBlock("latest");
+        const onChainStartTimeSeconds = Math.max(requestedStartTimeSeconds, latestBlock.timestamp);
+
+        const durationSeconds = requestedEndTimeSeconds - requestedStartTimeSeconds;
+        if (durationSeconds < 300) {
+            throw new Error("Auction duration must be at least 5 minutes");
+        }
+
+        if (requestedEndTimeSeconds <= onChainStartTimeSeconds) {
+            throw new Error("Auction end_time must be later than start_time");
+        }
+
+        console.log(
+            `Creating auction on-chain with start ${onChainStartTimeSeconds} and duration ${durationSeconds}s...`
+        );
         const tx = await contract.createAuction(
             auctionData.start_price.toString(),
             auctionData.step_price.toString(),
+            onChainStartTimeSeconds,
             durationSeconds,
             auctionData.title || "No metadata"
         );
 
-        console.log("Chờ transaction confirm...");
+        console.log("Waiting for createAuction transaction to be mined...");
         const receipt = await tx.wait();
+        if (receipt.status !== 1) {
+            throw new Error("createAuction transaction reverted");
+        }
 
-        // Extract blockchain_id from AuctionCreated event
-        const auctionCreatedEvent = receipt.events?.find(e => e.event === 'AuctionCreated');
-        const blockchain_id = auctionCreatedEvent?.args?.auctionId?.toNumber() || 1;
+        const auctionCreatedEvent = receipt.events?.find(
+            (event) => event.event === "AuctionCreated"
+        );
+        const blockchainId = auctionCreatedEvent?.args?.auctionId?.toNumber();
+        if (!blockchainId) {
+            throw new Error("AuctionCreated event not found in receipt");
+        }
 
-        console.log("✅ Tạo auction thành công!");
-        console.log(`   Contract Address: ${contractAddress}`);
-        console.log(`   Blockchain ID: ${blockchain_id}`);
+        const onChainAuction = await contract.getAuction(blockchainId);
+        const onChainStartTime = unixSecondsToDate(onChainAuction.startTime.toNumber());
+        const onChainEndTime = unixSecondsToDate(onChainAuction.endTime.toNumber());
 
-        // Return both contract address and blockchain_id
+        console.log("Auction created successfully on-chain");
+        console.log(`  Contract Address: ${contractAddress}`);
+        console.log(`  Blockchain ID: ${blockchainId}`);
+        console.log(`  On-chain Start Time: ${onChainStartTime.toISOString()}`);
+        console.log(`  On-chain End Time: ${onChainEndTime.toISOString()}`);
+
         return {
             contract_address: contractAddress,
-            blockchain_id: blockchain_id
+            blockchain_id: blockchainId,
+            deploy_tx_hash: tx.hash,
+            start_time: onChainStartTime,
+            end_time: onChainEndTime
         };
-
     } catch (error) {
-        console.error("Deploy thất bại:", error);
+        console.error("Auction deployment failed:", error);
         throw new Error(`Deploy failed: ${error.message || error}`);
     }
 }

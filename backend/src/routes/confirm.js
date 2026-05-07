@@ -37,7 +37,7 @@ router.post('/:id', authMiddleware, async (req, res) => {
             return res.status(400).json({ error: 'Auction is not waiting for confirmation' });
         }
 
-        // Blockchain confirmation (Best effort)
+        // Blockchain confirmation must succeed before any DB mirror update.
         if (auction.blockchain_id) {
             try {
                 console.log(`Attempting blockchain confirmation for ID ${auction.blockchain_id}`);
@@ -54,10 +54,16 @@ router.post('/:id', authMiddleware, async (req, res) => {
                 const tx = await contract.connect(userWallet).confirmReceived(auction.blockchain_id);
                 console.log(`Confirm transaction sent: ${tx.hash}`);
                 const receipt = await tx.wait();
+                if (receipt.status !== 1) {
+                    throw new Error('confirmReceived transaction reverted');
+                }
                 console.log(`Confirm confirmed in block ${receipt.blockNumber}`);
             } catch (error) {
-                console.error('⚠️ Blockchain confirmation failed (continuing off-chain):', error.message);
-                // Continue execution - do not fail the request
+                console.error('Blockchain confirmation failed:', error.message);
+                return res.status(502).json({
+                    error: 'Blockchain confirmation failed',
+                    details: error.message
+                });
             }
         }
 
@@ -88,13 +94,18 @@ router.post('/:id', authMiddleware, async (req, res) => {
                     );
                     settlementTxHash = result.txHash;
                     console.log(`✅ On-chain settlement successful! TX: ${settlementTxHash}`);
+                } else {
+                    throw new Error('Wallet settlement contract is unavailable or wallet addresses are missing');
                 }
             } catch (settleError) {
-                console.error('⚠️ On-chain settlement failed:', settleError.message);
-                // Fall back to off-chain DB update
+                console.error('On-chain settlement failed:', settleError.message);
+                return res.status(502).json({
+                    error: 'On-chain settlement failed',
+                    details: settleError.message
+                });
             }
 
-            // Update MongoDB as cache (off-chain fallback and for display)
+            // Update MongoDB as cache only after successful on-chain settlement.
             const sellerBalanceBigInt = BigInt(seller.balance_eth || "0");
             const newSellerBalance = (sellerBalanceBigInt + BigInt(bidAmountWei)).toString();
 

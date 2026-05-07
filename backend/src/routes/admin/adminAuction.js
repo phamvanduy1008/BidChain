@@ -163,7 +163,9 @@ router.post('/:id/approve', authMiddleware, requireRole, [param('id').isMongoId(
         approved_at: new Date(),
         contract_address: deployResult.contract_address,
         blockchain_id: deployResult.blockchain_id,
-        start_time: new Date(),
+        deploy_tx_hash: deployResult.deploy_tx_hash,
+        start_time: deployResult.start_time,
+        end_time: deployResult.end_time,
         // Metadata protection fields
         original_metadata: {
           title: auction.title,
@@ -228,9 +230,16 @@ router.post('/:id/deploy', authMiddleware, requireRole, [param('id').isMongoId()
     if (!auction) return res.status(404).json({ error: 'Auction not found' });
     // Deploy and update contract address
     try {
-      const contractAddress = await deployAuctionContract(auction);
-      await Auction.findByIdAndUpdate(auction._id, { contract_address: contractAddress, deploy_tx_hash: null, status: AUCTION_STATUS.DEPLOYING });
-      return res.json({ success: true, contract_address });
+      const deployResult = await deployAuctionContract(auction);
+      await Auction.findByIdAndUpdate(auction._id, {
+        contract_address: deployResult.contract_address,
+        blockchain_id: deployResult.blockchain_id,
+        deploy_tx_hash: deployResult.deploy_tx_hash,
+        start_time: deployResult.start_time,
+        end_time: deployResult.end_time,
+        status: AUCTION_STATUS.DEPLOYING
+      });
+      return res.json({ success: true, deploy: deployResult });
     } catch (err) {
       console.error('deploy error', err);
       return res.status(500).json({ error: 'Deploy failed', details: err.message });
@@ -288,8 +297,8 @@ router.post('/:id/end', authMiddleware, requireRole, [param('id').isMongoId()], 
     if (!auction) return res.status(404).json({ error: 'Auction not found' });
 
     if (!auction.contract_address || !auction.blockchain_id) {
-      return res.status(400).json({ 
-        error: 'Auction missing blockchain contract_address or blockchain_id' 
+      return res.status(400).json({
+        error: 'Auction missing blockchain contract_address or blockchain_id'
       });
     }
 
@@ -310,17 +319,17 @@ router.post('/:id/end', authMiddleware, requireRole, [param('id').isMongoId()], 
       const receipt = await tx.wait();
 
       // === THAY ĐỔI Ở ĐÂY ===
-      await Auction.findByIdAndUpdate(auction._id, { 
+      await Auction.findByIdAndUpdate(auction._id, {
         status: AUCTION_STATUS.ADMIN_ENDED,     // ← Đổi thành ADMIN_ENDED
         ended_by_admin: true,
         ended_by: requester._id,
         ended_at: new Date()
       });
 
-      return res.json({ 
-        success: true, 
-        message: 'Auction ended on-chain by Admin', 
-        tx_hash: receipt.transactionHash 
+      return res.json({
+        success: true,
+        message: 'Auction ended on-chain by Admin',
+        tx_hash: receipt.transactionHash
       });
 
     } catch (chainErr) {

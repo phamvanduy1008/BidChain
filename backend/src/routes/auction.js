@@ -106,6 +106,7 @@ router.post("/create", authMiddleware, [
   body("description").isString().notEmpty().withMessage("Description is required"),
   body("start_price").isFloat({ min: 10000 }).withMessage("Start price must be at least 10,000 VND"),
   body("step_price").isFloat({ min: 1000 }).withMessage("Step price must be at least 1,000 VND"),
+  body("start_time").isISO8601().withMessage("Valid start time required"),
   body("end_time").isISO8601().withMessage("Valid end time required"),
   body("images").isArray().optional(),
   body("category_id").isMongoId().withMessage("Valid category required")
@@ -121,6 +122,7 @@ router.post("/create", authMiddleware, [
       description,
       start_price, // VND
       step_price,  // VND
+      start_time,
       end_time,
       images = [],
       category_id
@@ -138,11 +140,15 @@ router.post("/create", authMiddleware, [
     const startPriceWei = vndToWei(start_price);
     const stepPriceWei = vndToWei(step_price);
 
-    // Validate end_time is in future
+    // Validate scheduled window
+    const startTime = new Date(start_time);
     const endTime = new Date(end_time);
     const now = new Date();
-    if (endTime <= now) {
-      return res.status(400).json({ error: "End time must be in the future" });
+    if (startTime <= now) {
+      return res.status(400).json({ error: "Start time must be in the future" });
+    }
+    if (endTime <= startTime) {
+      return res.status(400).json({ error: "End time must be later than start time" });
     }
 
     // Create auction in PENDING_APPROVAL status
@@ -156,8 +162,8 @@ router.post("/create", authMiddleware, [
       start_price: startPriceWei.toString(), // Store as string for Decimal128
       step_price: stepPriceWei.toString(),
       current_price: startPriceWei.toString(),
+      start_time: startTime,
       end_time: endTime,
-      start_time: null, // Will be set when approved
       approved_by: null,
       approved_at: null,
       contract_address: null,
@@ -189,6 +195,7 @@ router.post("/create", authMiddleware, [
         step_price_vnd: step_price,
         formatted_start_price: formatVnd(startPriceWei.toString()),
         formatted_step_price: formatVnd(stepPriceWei.toString()),
+        start_time: auction.start_time,
         end_time: auction.end_time
       }
     });
@@ -208,13 +215,13 @@ router.post("/create", authMiddleware, [
 // Lấy tất cả phiên đấu giá active (đã được duyệt)
 router.get("/all", async (req, res) => {
   try {
+    const serverTime = new Date();
     const auctions = await Auction.find({
       status: { $in: [AUCTION_STATUS.ACTIVE, AUCTION_STATUS.APPROVED] },
-      start_time: { $lte: new Date() }
     })
       .populate('seller_id', 'username full_name')
       .populate('highest_bidder_id', 'username full_name')
-      .sort({ end_time: 1 });
+      .sort({ start_time: 1, end_time: 1 });
 
     const auctionsWithVnd = await Promise.all(
       auctions.map(async (auction) => {
@@ -222,6 +229,7 @@ router.get("/all", async (req, res) => {
 
         return {
           ...auction.toObject(),
+          server_time: serverTime.toISOString(),
           start_price_vnd: weiToVnd(auction.start_price.toString()),
           current_price_vnd: weiToVnd(auction.current_price.toString()),
           step_price_vnd: weiToVnd(auction.step_price.toString()),
@@ -283,6 +291,7 @@ router.get("/:id", [param("id").isMongoId()], async (req, res) => {
 
     const auctionWithVnd = {
       ...auction.toObject(),
+      server_time: new Date().toISOString(),
       start_price_vnd: weiToVnd(auction.start_price.toString()),
       current_price_vnd: weiToVnd(auction.current_price.toString()),
       step_price_vnd: weiToVnd(auction.step_price.toString()),
@@ -651,8 +660,10 @@ router.post("/admin/approve/:auctionId", authMiddleware, async (req, res) => {
         approved_by: adminId,
         approved_at: new Date(),
         contract_address: deployResult.contract_address,
-        blockchain_id: deployResult.blockchain_id,  // ← THÊM DÒNG NÀY
-        start_time: new Date() // Set start time when approved
+        blockchain_id: deployResult.blockchain_id,
+        deploy_tx_hash: deployResult.deploy_tx_hash,
+        start_time: deployResult.start_time,
+        end_time: deployResult.end_time
       });
 
       console.log(`✅ Auction ${auctionId} approved with blockchain_id: ${deployResult.blockchain_id}`);
@@ -842,7 +853,5 @@ router.get("/admin/all", authMiddleware, async (req, res) => {
     res.status(500).json({ error: 'Failed to get auctions' });
   }
 });
-
-
 
 module.exports = router;
