@@ -1,8 +1,8 @@
 const Auction = require("../models/Auction");
 const Notification = require("../models/Notification");
-const { provider } = require("../blockchain/contract");
 const { AUCTION_STATUS } = require("../config/constants");
 const { weiToVnd, formatVnd } = require("../utils/conversion");
+const { getCurrentAuctionTime } = require("../utils/auctionTime");
 
 function emitAuctionState(io, auction, eventName, extra = {}) {
     if (!io) {
@@ -86,18 +86,17 @@ async function transitionEndedAuctions(io, chainNow) {
 
 async function runAuctionLifecycleCron() {
     try {
-        const latestBlock = await provider.getBlock("latest");
-        const chainNow = new Date(latestBlock.timestamp * 1000);
+        const currentNow = getCurrentAuctionTime();
         const io = global.io;
 
         if (io) {
             io.emit("server_time_sync", {
-                server_time: chainNow.toISOString()
+                server_time: currentNow.toISOString()
             });
         }
 
-        await transitionUpcomingAuctions(io, chainNow);
-        await transitionEndedAuctions(io, chainNow);
+        await transitionUpcomingAuctions(io, currentNow);
+        await transitionEndedAuctions(io, currentNow);
     } catch (error) {
         console.error("Auction lifecycle cron error:", error);
     }

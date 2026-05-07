@@ -61,8 +61,8 @@ async function deployAuctionContract(auctionData) {
         const onChainStartTimeSeconds = Math.max(requestedStartTimeSeconds, latestBlock.timestamp);
 
         const durationSeconds = requestedEndTimeSeconds - requestedStartTimeSeconds;
-        if (durationSeconds < 300) {
-            throw new Error("Auction duration must be at least 5 minutes");
+        if (durationSeconds < 60) {
+            throw new Error("Auction duration must be at least 1 minute");
         }
 
         if (requestedEndTimeSeconds <= onChainStartTimeSeconds) {

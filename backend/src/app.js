@@ -15,6 +15,7 @@ const adminAuctionRouter = require("./routes/admin/adminAuction");
 const adminDashboardRouter = require("./routes/admin/adminDashboard");
 const confirmRoutes = require("./routes/confirm");
 const uploadRouter = require("./routes/upload");
+const { getCurrentAuctionTime } = require("./utils/auctionTime");
 
 const app = express();
 app.use(cors());
@@ -46,17 +47,19 @@ setInterval(runSettlementCron, 20000);
 console.log("Settlement cron job started (runs every 20s)");
 
 const { runAuctionLifecycleCron } = require("./cron/lifecycle");
-setInterval(runAuctionLifecycleCron, 5000);
-console.log("Auction lifecycle cron job started (runs every 5s)");
+setInterval(runAuctionLifecycleCron, 1000);
+console.log("Auction lifecycle cron job started (runs every 1s)");
 
 const { startIntegrityCron } = require("./cron/integrity");
 startIntegrityCron();
+
+const startAuctionScheduler = require("./scheduler/auctionScheduler");
 
 io.on("connection", (socket) => {
   console.log("New client:", socket.id);
 
   socket.emit("server_time_sync", {
-    server_time: new Date().toISOString()
+    server_time: getCurrentAuctionTime().toISOString()
   });
 
   socket.on("join_room", (auctionId) => {
@@ -95,6 +98,7 @@ const PORT = process.env.PORT || 3000;
 mongoose
   .connect(process.env.MONGO_URI)
   .then(() => {
+    startAuctionScheduler();
     server.listen(PORT, () => {
       console.log("Backend running at http://localhost:" + PORT);
     });

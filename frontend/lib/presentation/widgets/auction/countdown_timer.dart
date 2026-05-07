@@ -10,6 +10,7 @@ class CountdownTimer extends StatefulWidget {
   final String? status;
   final TextStyle? textStyle;
   final bool showLarge;
+  final VoidCallback? onExpired;
 
   const CountdownTimer({
     super.key,
@@ -18,6 +19,7 @@ class CountdownTimer extends StatefulWidget {
     this.status,
     this.textStyle,
     this.showLarge = false,
+    this.onExpired,
   });
 
   @override
@@ -30,6 +32,7 @@ class _CountdownTimerState extends State<CountdownTimer>
   Duration _remaining = Duration.zero;
   late AnimationController _pulseController;
   late Animation<double> _opacityAnimation;
+  bool _hasTriggeredExpiredCallback = false;
 
   bool get _isUpcoming =>
       (widget.status ?? '').toUpperCase() == 'APPROVED' &&
@@ -55,7 +58,26 @@ class _CountdownTimerState extends State<CountdownTimer>
     });
   }
 
+  @override
+  void didUpdateWidget(covariant CountdownTimer oldWidget) {
+    super.didUpdateWidget(oldWidget);
+
+    final targetChanged =
+        oldWidget.startTime != widget.startTime ||
+        oldWidget.endTime != widget.endTime ||
+        oldWidget.status != widget.status;
+
+    if (!targetChanged) {
+      return;
+    }
+
+    _hasTriggeredExpiredCallback = false;
+    _updateRemaining();
+  }
+
   void _updateRemaining() {
+    final previousRemaining = _remaining;
+
     setState(() {
       final now = ServerTimeService().now;
       _remaining = _targetTime.difference(now);
@@ -71,6 +93,13 @@ class _CountdownTimerState extends State<CountdownTimer>
         _pulseController.reset();
       }
     });
+
+    if (previousRemaining > Duration.zero &&
+        _remaining == Duration.zero &&
+        !_hasTriggeredExpiredCallback) {
+      _hasTriggeredExpiredCallback = true;
+      widget.onExpired?.call();
+    }
   }
 
   @override

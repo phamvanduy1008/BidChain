@@ -8,6 +8,7 @@ const Notification = require("../models/Notification");
 const { provider, walletFromPrivateKey } = require("../blockchain/contract");
 const { formatVnd } = require("../utils/conversion");
 const { AUCTION_STATUS } = require("../config/constants");
+const { getCurrentAuctionTimestampSeconds } = require("../utils/auctionTime");
 require("dotenv").config();
 
 const SETTLEMENT_BUFFER_SECONDS = Number(process.env.SETTLEMENT_BUFFER_SECONDS || 3);
@@ -37,7 +38,7 @@ async function fetchOnChainAuctionState(auction) {
 }
 
 function isSettlementWindowOpen(onChainAuction, latestBlock) {
-    return latestBlock.timestamp >= onChainAuction.endTime.toNumber() + SETTLEMENT_BUFFER_SECONDS;
+    return getCurrentAuctionTimestampSeconds() >= onChainAuction.endTime.toNumber() + SETTLEMENT_BUFFER_SECONDS;
 }
 
 async function finalizeNoBidAuction(auction, onChainAuction) {
@@ -123,10 +124,11 @@ async function settleAuctionOnChain(auction) {
         console.log(`\n========== Settling Auction ${auction._id} ==========`);
 
         const { onChainAuction, latestBlock } = await fetchOnChainAuctionState(auction);
+        const currentTimestamp = getCurrentAuctionTimestampSeconds();
 
         if (!isSettlementWindowOpen(onChainAuction, latestBlock)) {
             console.log(
-                `Skipping ${auction._id}: latest=${latestBlock.timestamp}, end=${onChainAuction.endTime.toString()}, buffer=${SETTLEMENT_BUFFER_SECONDS}s`
+                `Skipping ${auction._id}: latest=${latestBlock.timestamp}, server=${currentTimestamp}, end=${onChainAuction.endTime.toString()}, buffer=${SETTLEMENT_BUFFER_SECONDS}s`
             );
             return;
         }
@@ -197,7 +199,7 @@ async function settleAuctionOnChain(auction) {
 async function runSettlementCron() {
     try {
         const candidates = await Auction.find({
-            status: { $in: [AUCTION_STATUS.ACTIVE, AUCTION_STATUS.ENDED] },
+            status: AUCTION_STATUS.ENDED,
             settled_on_chain: false,
             blockchain_id: { $exists: true, $ne: null },
             contract_address: { $exists: true, $ne: null }

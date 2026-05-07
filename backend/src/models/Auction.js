@@ -49,6 +49,7 @@ const AuctionSchema = new mongoose.Schema({
   },
 
   highest_bidder_id: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+  started_at: { type: Date },
   start_time: { type: Date },
   end_time: { type: Date, required: true, index: true },
 

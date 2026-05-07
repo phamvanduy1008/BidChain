@@ -8,6 +8,7 @@ import '../../../config/theme/app_text_styles.dart';
 import '../../../core/services/server_time_service.dart';
 import '../../../core/services/socket_service.dart';
 import '../../../core/utils/app_localizations.dart';
+import '../../../core/utils/auction_status_resolver.dart';
 import '../../bloc/auction/auction_bloc.dart';
 import '../../bloc/auction/auction_event.dart';
 import '../../bloc/auction/auction_state.dart';
@@ -209,6 +210,11 @@ class _AuctionListPageState extends State<AuctionListPage> {
                               auction.endTime,
                               auction.status,
                             ),
+                            status: resolveAuctionStatus(
+                              status: auction.status,
+                              startTime: auction.startTime,
+                              endTime: auction.endTime,
+                            ),
                             bidCount: auction.bidCount,
                             sellerName: auction.sellerName,
                             onTap: () {
@@ -404,7 +410,15 @@ class _AuctionListPageState extends State<AuctionListPage> {
     String status,
   ) {
     final now = ServerTimeService().now;
-    if (status == 'APPROVED' && startTime != null && now.isBefore(startTime)) {
+    final effectiveStatus = resolveAuctionStatus(
+      status: status,
+      startTime: startTime,
+      endTime: endTime,
+      now: now,
+    );
+    if (effectiveStatus == 'APPROVED' &&
+        startTime != null &&
+        now.isBefore(startTime)) {
       return 'Bắt đầu ${AppLocalizations.formatTimeLeft(startTime)}';
     }
     return AppLocalizations.formatTimeLeft(endTime);

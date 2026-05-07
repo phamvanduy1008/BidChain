@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import '../../../config/theme/app_colors.dart';
 import '../../../config/theme/app_text_styles.dart';
+import '../../../core/services/server_time_service.dart';
+import '../../../core/utils/auction_status_resolver.dart';
 import '../../../domain/entities/my_auction_entity.dart';
 import '../common/status_badge.dart';
 
@@ -13,6 +15,10 @@ class MyAuctionCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final hasImage = auction.images.isNotEmpty;
+    final effectiveStatus = resolveAuctionStatus(
+      status: auction.status,
+      endTime: auction.endTime,
+    );
     final timeRemaining = _getTimeRemaining(auction.endTime);
 
     return Card(
@@ -46,7 +52,7 @@ class MyAuctionCard extends StatelessWidget {
                     Positioned(
                       top: 8,
                       right: 8,
-                      child: StatusBadge(status: auction.status),
+                      child: StatusBadge(status: effectiveStatus),
                     ),
                   ],
                 ),
@@ -58,7 +64,7 @@ class MyAuctionCard extends StatelessWidget {
                   Positioned(
                     top: 8,
                     right: 8,
-                    child: StatusBadge(status: auction.status),
+                    child: StatusBadge(status: effectiveStatus),
                   ),
                 ],
               ),
@@ -204,7 +210,7 @@ class MyAuctionCard extends StatelessWidget {
   }
 
   String _getTimeRemaining(DateTime endTime) {
-    final now = DateTime.now();
+    final now = ServerTimeService().now;
     final difference = endTime.difference(now);
 
     if (difference.isNegative) {

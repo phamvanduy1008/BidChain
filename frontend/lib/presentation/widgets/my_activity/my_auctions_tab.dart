@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import '../../../core/utils/auction_status_resolver.dart';
 import '../../../domain/entities/my_auction_entity.dart';
 import '../common/empty_state.dart';
 import 'my_auction_card.dart';
@@ -37,27 +38,69 @@ class MyAuctionsTab extends StatelessWidget {
     final List<MyAuctionEntity> filtered = [];
     
     groupedByProduct.forEach((productKey, auctionGroup) {
+      final sortedGroup = [...auctionGroup];
+      int priority(MyAuctionEntity auction) {
+        final effectiveStatus = resolveAuctionStatus(
+          status: auction.status,
+          endTime: auction.endTime,
+        );
+        switch (effectiveStatus) {
+          case 'ACTIVE':
+            return 0;
+          case 'APPROVED':
+            return 1;
+          case 'ENDED':
+          case 'SETTLED':
+            return 2;
+          default:
+            return 3;
+        }
+      }
+
+      sortedGroup.sort((a, b) => priority(a).compareTo(priority(b)));
+
       // Priority order: ACTIVE > APPROVED > ENDED > PENDING_APPROVAL
       MyAuctionEntity? selectedAuction;
       
       // Try to find ACTIVE first
-      selectedAuction = auctionGroup.firstWhere(
-        (a) => a.status == 'ACTIVE',
-        orElse: () => auctionGroup.first,
+      selectedAuction = sortedGroup.firstWhere(
+        (a) => resolveAuctionStatus(
+              status: a.status,
+              endTime: a.endTime,
+            ) ==
+            'ACTIVE',
+        orElse: () => sortedGroup.first,
       );
       
       // If no ACTIVE, try APPROVED
-      if (selectedAuction.status != 'ACTIVE') {
-        selectedAuction = auctionGroup.firstWhere(
-          (a) => a.status == 'APPROVED',
+      if (resolveAuctionStatus(
+            status: selectedAuction.status,
+            endTime: selectedAuction.endTime,
+          ) !=
+          'ACTIVE') {
+        selectedAuction = sortedGroup.firstWhere(
+          (a) => resolveAuctionStatus(
+                status: a.status,
+                endTime: a.endTime,
+              ) ==
+              'APPROVED',
           orElse: () => selectedAuction!,
         );
       }
       
       // If no ACTIVE/APPROVED, try ENDED
-      if (selectedAuction.status != 'ACTIVE' && selectedAuction.status != 'APPROVED') {
-        selectedAuction = auctionGroup.firstWhere(
-          (a) => a.status == 'ENDED',
+      final selectedEffectiveStatus = resolveAuctionStatus(
+        status: selectedAuction.status,
+        endTime: selectedAuction.endTime,
+      );
+      if (selectedEffectiveStatus != 'ACTIVE' &&
+          selectedEffectiveStatus != 'APPROVED') {
+        selectedAuction = sortedGroup.firstWhere(
+          (a) => resolveAuctionStatus(
+                status: a.status,
+                endTime: a.endTime,
+              ) ==
+              'ENDED',
           orElse: () => selectedAuction!,
         );
       }

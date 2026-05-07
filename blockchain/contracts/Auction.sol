@@ -144,7 +144,7 @@ contract Auction {
         require(_startPriceWei > 0, "Invalid start price");
         require(_stepPriceWei > 0, "Invalid step price");
         require(_startTime >= block.timestamp, "Invalid start time");
-        require(_durationInSeconds >= 300, "Duration too short"); // Min 5 minutes
+        require(_durationInSeconds >= 60, "Duration too short"); // Min 1 minute
 
         auctionCount++;
 

@@ -6,6 +6,8 @@ import 'package:frontend/core/services/socket_service.dart';
 import 'package:go_router/go_router.dart';
 import '../../../config/theme/app_colors.dart';
 import '../../../config/theme/app_text_styles.dart';
+import '../../../core/services/server_time_service.dart';
+import '../../../core/utils/auction_status_resolver.dart';
 import '../../../core/utils/app_localizations.dart';
 import '../../bloc/auth/auth_bloc.dart';
 import '../../bloc/auth/auth_event.dart';
@@ -37,6 +39,8 @@ class AuctionDetailPage extends StatefulWidget {
 class _AuctionDetailPageState extends State<AuctionDetailPage> {
   final SocketService _socketService = SocketService();
   StreamSubscription<Map<String, dynamic>>? _auctionEventSubscription;
+  Timer? _countdownExpiryRefreshTimer;
+  Timer? _statusTransitionPollTimer;
 
   @override
   void initState() {
@@ -52,6 +56,8 @@ class _AuctionDetailPageState extends State<AuctionDetailPage> {
 
   @override
   void dispose() {
+    _countdownExpiryRefreshTimer?.cancel();
+    _statusTransitionPollTimer?.cancel();
     _auctionEventSubscription?.cancel();
     _socketService.leaveAuctionRoom(widget.auctionId);
     super.dispose();
@@ -132,6 +138,59 @@ class _AuctionDetailPageState extends State<AuctionDetailPage> {
         ],
       ),
     );
+  }
+
+  void _handleCountdownExpired() {
+    _countdownExpiryRefreshTimer?.cancel();
+    _statusTransitionPollTimer?.cancel();
+
+    final currentState = context.read<AuctionDetailBloc>().state;
+    String? expectedOldStatus;
+
+    if (currentState is AuctionDetailLoaded) {
+      expectedOldStatus = currentState.auction.status;
+    }
+
+    _countdownExpiryRefreshTimer = Timer(const Duration(milliseconds: 300), () {
+      if (!mounted) return;
+
+      context.read<AuctionDetailBloc>().add(
+        RefreshAuctionDetail(auctionId: widget.auctionId),
+      );
+
+      if (expectedOldStatus != null) {
+        _startStatusTransitionPolling(expectedOldStatus);
+      }
+    });
+  }
+
+  void _startStatusTransitionPolling(String expectedOldStatus) {
+    var attempts = 0;
+
+    _statusTransitionPollTimer = Timer.periodic(const Duration(seconds: 1), (
+      timer,
+    ) {
+      if (!mounted) {
+        timer.cancel();
+        return;
+      }
+
+      final state = context.read<AuctionDetailBloc>().state;
+      if (state is AuctionDetailLoaded &&
+          state.auction.status != expectedOldStatus) {
+        timer.cancel();
+        return;
+      }
+
+      attempts++;
+      context.read<AuctionDetailBloc>().add(
+        RefreshAuctionDetail(auctionId: widget.auctionId),
+      );
+
+      if (attempts >= 8) {
+        timer.cancel();
+      }
+    });
   }
 
   // ==================== CHAT ====================
@@ -249,10 +308,31 @@ class _AuctionDetailPageState extends State<AuctionDetailPage> {
     );
   }
 
-  bool _isAuctionCreator(BuildContext context, String sellerId) {
+  bool _isAuctionCreator(
+    BuildContext context, {
+    required String sellerId,
+    String? sellerEmail,
+    String? sellerName,
+  }) {
     final authState = context.read<AuthBloc>().state;
     if (authState is AuthSuccessState) {
-      return authState.user.id == sellerId;
+      final user = authState.user;
+
+      if (user.id == sellerId) {
+        return true;
+      }
+
+      if (sellerEmail != null &&
+          sellerEmail.isNotEmpty &&
+          user.email.toLowerCase() == sellerEmail.toLowerCase()) {
+        return true;
+      }
+
+      if (sellerName != null &&
+          sellerName.isNotEmpty &&
+          user.fullName.trim().toLowerCase() == sellerName.trim().toLowerCase()) {
+        return true;
+      }
     }
     return false;
   }
@@ -263,6 +343,14 @@ class _AuctionDetailPageState extends State<AuctionDetailPage> {
       return authState.user.id == auction.highestBidderId;
     }
     return false;
+  }
+
+  String _resolveEffectiveStatus(auction) {
+    return resolveAuctionStatus(
+      status: auction.status,
+      startTime: auction.startTime,
+      endTime: auction.endTime,
+    );
   }
 
   void _showConfirmDialog(BuildContext context, auction) {
@@ -355,6 +443,13 @@ class _AuctionDetailPageState extends State<AuctionDetailPage> {
           : state is ReceiptError
           ? state.auction
           : (state as BidError).auction;
+      final effectiveStatus = _resolveEffectiveStatus(auction);
+      final isAuctionCreator = _isAuctionCreator(
+        context,
+        sellerId: auction.sellerId,
+        sellerEmail: auction.sellerEmail,
+        sellerName: auction.sellerName,
+      );
 
       return RefreshIndicator(
         onRefresh: () async {
@@ -375,20 +470,21 @@ class _AuctionDetailPageState extends State<AuctionDetailPage> {
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      StatusBadge(status: auction.status),
+                      StatusBadge(status: effectiveStatus),
                       const SizedBox(height: 8),
                       Align(
                         alignment: Alignment.centerRight,
                         child: CountdownTimer(
                           startTime: auction.startTime,
                           endTime: auction.endTime,
-                          status: auction.status,
+                          status: effectiveStatus,
+                          onExpired: _handleCountdownExpired,
                         ),
                       ),
                     ],
                   ),
 
-                  if (_isAuctionCreator(context, auction.sellerId)) ...[
+                  if (isAuctionCreator) ...[
                     const SizedBox(height: 16),
                     // Owner badge
                     Container(
@@ -614,6 +710,7 @@ class _AuctionDetailPageState extends State<AuctionDetailPage> {
   }
 
   void _showPlaceBidDialog(BuildContext context, auction) {
+    final effectiveStatus = _resolveEffectiveStatus(auction);
     showDialog(
       context: context,
       builder: (dialogContext) => PlaceBidDialog(
@@ -623,7 +720,7 @@ class _AuctionDetailPageState extends State<AuctionDetailPage> {
         formattedCurrentPrice: auction.formattedCurrentPrice,
         formattedStepPrice: auction.formattedStepPrice,
         endTime: auction.endTime,
-        status: auction.status,
+        status: effectiveStatus,
         onPlaceBid: (amount) {
           context.read<AuctionDetailBloc>().add(
             PlaceBid(auctionId: widget.auctionId, amountVnd: amount),
@@ -640,8 +737,15 @@ class _AuctionDetailPageState extends State<AuctionDetailPage> {
     if (state is! AuctionDetailLoaded) return null;
 
     final auction = state.auction;
+    final effectiveStatus = _resolveEffectiveStatus(auction);
+    final isAuctionCreator = _isAuctionCreator(
+      context,
+      sellerId: auction.sellerId,
+      sellerEmail: auction.sellerEmail,
+      sellerName: auction.sellerName,
+    );
 
-    if (auction.isActive && !_isAuctionCreator(context, auction.sellerId)) {
+    if (effectiveStatus == 'ACTIVE' && !isAuctionCreator) {
       return FloatingActionButton.extended(
         onPressed: () => _showPlaceBidDialog(context, auction),
         backgroundColor: AppColors.accent,
@@ -653,8 +757,7 @@ class _AuctionDetailPageState extends State<AuctionDetailPage> {
       );
     }
 
-    if (auction.status == 'APPROVED' &&
-        !_isAuctionCreator(context, auction.sellerId)) {
+    if (effectiveStatus == 'APPROVED' && !isAuctionCreator) {
       return FloatingActionButton.extended(
         onPressed: null,
         backgroundColor: AppColors.grey,
