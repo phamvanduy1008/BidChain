@@ -6,6 +6,7 @@ class AuctionEntity extends Equatable {
   final String startingPrice; // Wei
   final String highestBid; // Wei
   final String highestBidder;
+  final DateTime? startTime;
   final DateTime endTime;
   final String metadataUrl;
   final bool ended;
@@ -26,6 +27,7 @@ class AuctionEntity extends Equatable {
     required this.startingPrice,
     required this.highestBid,
     required this.highestBidder,
+    this.startTime,
     required this.endTime,
     required this.metadataUrl,
     required this.ended,
@@ -48,6 +50,7 @@ class AuctionEntity extends Equatable {
     startingPrice,
     highestBid,
     highestBidder,
+    startTime,
     endTime,
     metadataUrl,
     ended,
@@ -63,5 +66,5 @@ class AuctionEntity extends Equatable {
     status,
   ];
 
-  bool get isActive => status == 'ACTIVE' || status == 'APPROVED';
+  bool get isActive => status == 'ACTIVE';
 }

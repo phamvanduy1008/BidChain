@@ -1,4 +1,5 @@
 import '../../domain/entities/auction_entity.dart';
+import '../../core/services/server_time_service.dart';
 
 class AuctionModel extends AuctionEntity {
   const AuctionModel({
@@ -7,6 +8,7 @@ class AuctionModel extends AuctionEntity {
     required super.startingPrice,
     required super.highestBid,
     required super.highestBidder,
+    super.startTime,
     required super.endTime,
     required super.metadataUrl,
     required super.ended,
@@ -23,6 +25,8 @@ class AuctionModel extends AuctionEntity {
   });
 
   factory AuctionModel.fromJson(Map<String, dynamic> json) {
+    ServerTimeService().syncFromIso(json['server_time']?.toString());
+
     return AuctionModel(
       auctionId: json['_id']?.toString() ?? json['id']?.toString() ?? '',
       seller: json['seller_id'] is Map
@@ -33,6 +37,9 @@ class AuctionModel extends AuctionEntity {
       highestBidder: json['highest_bidder_id'] is Map
           ? (json['highest_bidder_id']['_id'] ?? '')
           : (json['highest_bidder_id'] ?? ''),
+      startTime: json['start_time'] != null
+          ? DateTime.parse(json['start_time'])
+          : null,
       endTime: json['end_time'] != null
           ? DateTime.parse(json['end_time'])
           : DateTime.now(),
@@ -63,8 +70,8 @@ class AuctionModel extends AuctionEntity {
       'start_price': startingPrice,
       'current_price': highestBid,
       'highest_bidder_id': highestBidder,
+      'start_time': startTime?.toIso8601String(),
       'end_time': endTime.toIso8601String(),
-      'metadata_url': metadataUrl,
       'status': status,
       'winner': winner,
       'created_at': createdAt.toIso8601String(),

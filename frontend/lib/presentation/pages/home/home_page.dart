@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:frontend/core/services/notification_popup_service.dart';
+import 'package:frontend/core/services/server_time_service.dart';
 import 'package:frontend/core/services/socket_service.dart';
 import 'package:go_router/go_router.dart';
 import '../../../config/routes/app_routes.dart';
@@ -38,6 +39,7 @@ class _HomePageState extends State<HomePage>
   DateTime? _lastRefreshTime;
   static const _refreshThreshold = Duration(minutes: 5);
   StreamSubscription? _notificationSubscription;
+  StreamSubscription<Map<String, dynamic>>? _auctionEventSubscription;
 
   @override
   bool get wantKeepAlive => true;
@@ -68,6 +70,11 @@ class _HomePageState extends State<HomePage>
         );
       }
     });
+    _auctionEventSubscription = socketService.auctionEventStream.listen((_) {
+      if (mounted) {
+        context.read<AuctionBloc>().add(RefreshAuctions());
+      }
+    });
   }
 
   @override
@@ -75,6 +82,7 @@ class _HomePageState extends State<HomePage>
     WidgetsBinding.instance.removeObserver(this);
     _searchController.dispose();
     _notificationSubscription?.cancel();
+    _auctionEventSubscription?.cancel();
     super.dispose();
   }
 
@@ -213,7 +221,11 @@ class _HomePageState extends State<HomePage>
                                       ? auction.images.first
                                       : null,
                                   currentBid: auction.formattedCurrentPrice,
-                                  timeLeft: _calculateTimeLeft(auction.endTime),
+                                  timeLeft: _calculateTimeLeft(
+                                    auction.startTime,
+                                    auction.endTime,
+                                    auction.status,
+                                  ),
                                   bidCount: auction.bidCount,
                                   sellerName: auction.sellerName,
                                   onTap: () {
@@ -352,7 +364,11 @@ class _HomePageState extends State<HomePage>
                                 ? auction.images.first
                                 : null,
                             currentBid: auction.formattedCurrentPrice,
-                            timeLeft: _calculateTimeLeft(auction.endTime),
+                            timeLeft: _calculateTimeLeft(
+                              auction.startTime,
+                              auction.endTime,
+                              auction.status,
+                            ),
                             bidCount: auction.bidCount,
                             sellerName: auction.sellerName,
                             onTap: () {
@@ -397,7 +413,7 @@ class _HomePageState extends State<HomePage>
           builder: (context, state) {
             return IconButton(
               icon: Badge(
-                 backgroundColor: Colors.red,
+                backgroundColor: Colors.red,
                 isLabelVisible: state.unreadCount > 0,
                 label: Text('${state.unreadCount}'),
                 child: const Icon(
@@ -557,12 +573,14 @@ class _HomePageState extends State<HomePage>
     return Icons.category; // default
   }
 
-  String _calculateTimeLeft(DateTime endTime) {
-    final now = DateTime.now();
-    final difference = endTime.difference(now);
-
-    if (difference.isNegative) {
-      return AppLocalizations.formatTimeLeft(endTime);
+  String _calculateTimeLeft(
+    DateTime? startTime,
+    DateTime endTime,
+    String status,
+  ) {
+    final now = ServerTimeService().now;
+    if (status == 'APPROVED' && startTime != null && now.isBefore(startTime)) {
+      return 'Bắt đầu ${AppLocalizations.formatTimeLeft(startTime)}';
     }
     return AppLocalizations.formatTimeLeft(endTime);
   }

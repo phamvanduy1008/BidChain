@@ -9,7 +9,9 @@ class PlaceBidDialog extends StatefulWidget {
   final double stepPrice;
   final String formattedCurrentPrice;
   final String formattedStepPrice;
+  final DateTime? startTime;
   final DateTime endTime;
+  final String? status;
   final Function(double) onPlaceBid;
 
   const PlaceBidDialog({
@@ -18,7 +20,9 @@ class PlaceBidDialog extends StatefulWidget {
     required this.stepPrice,
     required this.formattedCurrentPrice,
     required this.formattedStepPrice,
+    this.startTime,
     required this.endTime,
+    this.status,
     required this.onPlaceBid,
   });
 
@@ -99,7 +103,9 @@ class _PlaceBidDialogState extends State<PlaceBidDialog> {
             // Large Timer Display
             Center(
               child: CountdownTimer(
+                startTime: widget.startTime,
                 endTime: widget.endTime,
+                status: widget.status,
                 showLarge: true,
               ),
             ),

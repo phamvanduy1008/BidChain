@@ -1,5 +1,6 @@
 import '../../domain/entities/auction_detail_entity.dart';
 import '../../domain/entities/bid_entity.dart';
+import '../../core/services/server_time_service.dart';
 import 'bid_model.dart';
 
 class AuctionDetailModel extends AuctionDetailEntity {
@@ -28,6 +29,8 @@ class AuctionDetailModel extends AuctionDetailEntity {
   });
 
   factory AuctionDetailModel.fromJson(Map<String, dynamic> json) {
+    ServerTimeService().syncFromIso(json['server_time']?.toString());
+
     // Parse bids
     List<BidEntity> bidsList = [];
     if (json['bids'] != null && json['bids'] is List) {

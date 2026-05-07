@@ -1,10 +1,12 @@
+import '../services/server_time_service.dart';
+
 class AppLocalizations {
   static String translateStatus(String? status) {
     switch ((status ?? '').toUpperCase()) {
       case 'PENDING_APPROVAL':
         return 'Chờ duyệt';
       case 'APPROVED':
-        return 'Đã duyệt';
+        return 'Sắp diễn ra';
       case 'ACTIVE':
         return 'Đang diễn ra';
       case 'ENDED':
@@ -47,7 +49,7 @@ class AppLocalizations {
   }
 
   static String formatTimeLeft(DateTime endTime) {
-    final difference = endTime.difference(DateTime.now());
+    final difference = endTime.difference(ServerTimeService().now);
 
     if (difference.isNegative) {
       return 'Đã kết thúc';

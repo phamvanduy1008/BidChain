@@ -1,19 +1,28 @@
-import 'package:socket_io_client/socket_io_client.dart' as IO;
 import 'dart:async';
+import 'package:socket_io_client/socket_io_client.dart' as io;
 import '../network/dio_client.dart';
 import '../../config/constants/api_constants.dart';
 import '../../data/models/user_model.dart';
+import 'server_time_service.dart';
 
 class SocketService {
   static final SocketService _instance = SocketService._internal();
   factory SocketService() => _instance;
   SocketService._internal();
 
-  IO.Socket? _socket;
+  io.Socket? _socket;
   String? _userId;
   Function(UserModel)? onBalanceUpdated;
+
   final _notificationController = StreamController<dynamic>.broadcast();
+  final _auctionEventController =
+      StreamController<Map<String, dynamic>>.broadcast();
+  final _timeSyncController = StreamController<DateTime>.broadcast();
+
   Stream<dynamic> get notificationStream => _notificationController.stream;
+  Stream<Map<String, dynamic>> get auctionEventStream =>
+      _auctionEventController.stream;
+  Stream<DateTime> get timeSyncStream => _timeSyncController.stream;
 
   bool get isConnected => _socket?.connected ?? false;
 
@@ -23,10 +32,9 @@ class SocketService {
     }
 
     _userId = userId;
-
-    _socket = IO.io(
+    _socket = io.io(
       baseUrl,
-      IO.OptionBuilder()
+      io.OptionBuilder()
           .setTransports(['websocket'])
           .disableAutoConnect()
           .setReconnectionAttempts(5)
@@ -37,32 +45,48 @@ class SocketService {
     _socket!.connect();
 
     _socket!.onConnect((_) {
-      print('✅ Socket connected: ${_socket!.id}');
-      // Join user-specific room
       _socket!.emit('join_user_room', userId);
-      print('📍 Joined user room: user_$userId');
     });
 
     _socket!.on('balance_updated', (data) async {
-      print('💰 Balance updated event received: $data');
       await fetchAndUpdateBalance();
     });
 
     _socket!.on('notification', (data) {
-      print('🔔 Notification received: $data');
       _notificationController.add(data);
     });
 
-    _socket!.onDisconnect((_) {
-      print('❌ Socket disconnected');
+    _socket!.on('server_time_sync', (data) {
+      final iso = data is Map ? data['server_time']?.toString() : null;
+      ServerTimeService().syncFromIso(iso);
+      if (iso != null) {
+        _timeSyncController.add(DateTime.parse(iso));
+      }
     });
 
-    _socket!.onError((error) {
-      print('⚠️ Socket error: $error');
-    });
+    for (final eventName in const [
+      'new_bid',
+      'bid_placed',
+      'auction_started',
+      'auction_ended',
+      'auction_state_changed',
+      'auction_settled',
+      'user_outbid',
+    ]) {
+      _socket!.on(eventName, (data) {
+        if (data is Map) {
+          final payload = Map<String, dynamic>.from(data);
+          payload['event_name'] = eventName;
+          final iso = payload['server_time']?.toString();
+          if (iso != null) {
+            ServerTimeService().syncFromIso(iso);
+          }
+          _auctionEventController.add(payload);
+        }
+      });
+    }
 
     _socket!.onReconnect((_) {
-      print('🔄 Socket reconnected');
       if (_userId != null) {
         _socket!.emit('join_user_room', _userId);
       }
@@ -71,52 +95,33 @@ class SocketService {
 
   Future<void> fetchAndUpdateBalance() async {
     try {
-      print('🔄 Fetching fresh user data...');
       final dio = DioClient();
       final response = await dio.get(ApiConstants.getUserProfile);
-
-      print('📥 Response Status: ${response.statusCode}');
-      print('📥 Response Data Type: ${response.data.runtimeType}');
-
       if (response.statusCode == 200) {
-        // Backend /user/me returns user object directly, not wrapped in 'data'
-        final userData = response.data as Map<String, dynamic>;
-
-        print(
-          '🔍 Raw balance_eth: ${userData['balance_eth']} (Type: ${userData['balance_eth'].runtimeType})',
-        );
-
-        final user = UserModel.fromJson(userData);
+        final user = UserModel.fromJson(response.data as Map<String, dynamic>);
         onBalanceUpdated?.call(user);
-        print('✅ Balance updated: ${user.balanceEth} ETH');
       }
-    } catch (e, stackTrace) {
-      print('❌ Error fetching balance: $e');
-      print('Stack trace: $stackTrace');
+    } catch (_) {
+      // Ignore transient sync failures.
     }
   }
 
   void joinAuctionRoom(String auctionId) {
     if (_socket?.connected == true) {
       _socket!.emit('join_auction', auctionId);
-      print('📍 Joined auction room: auction_$auctionId');
     }
   }
 
   void leaveAuctionRoom(String auctionId) {
     if (_socket?.connected == true) {
       _socket!.emit('leave_auction', auctionId);
-      print('👋 Left auction room: auction_$auctionId');
     }
   }
 
   void disconnect() {
-    if (_socket != null) {
-      _socket!.disconnect();
-      _socket!.dispose();
-      _socket = null;
-      _userId = null;
-      print('🔌 Socket disconnected and disposed');
-    }
+    _socket?.disconnect();
+    _socket?.dispose();
+    _socket = null;
+    _userId = null;
   }
 }

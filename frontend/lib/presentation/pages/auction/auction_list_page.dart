@@ -1,9 +1,12 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import '../../../config/routes/app_routes.dart';
 import '../../../config/theme/app_colors.dart';
 import '../../../config/theme/app_text_styles.dart';
+import '../../../core/services/server_time_service.dart';
+import '../../../core/services/socket_service.dart';
 import '../../../core/utils/app_localizations.dart';
 import '../../bloc/auction/auction_bloc.dart';
 import '../../bloc/auction/auction_event.dart';
@@ -22,13 +25,20 @@ class AuctionListPage extends StatefulWidget {
 }
 
 class _AuctionListPageState extends State<AuctionListPage> {
+  final SocketService _socketService = SocketService();
   String? _selectedCategoryId;
   String _searchQuery = '';
   final TextEditingController _searchController = TextEditingController();
+  StreamSubscription<Map<String, dynamic>>? _auctionEventSubscription;
 
   @override
   void initState() {
     super.initState();
+    _auctionEventSubscription = _socketService.auctionEventStream.listen((_) {
+      if (mounted) {
+        context.read<AuctionBloc>().add(RefreshAuctions());
+      }
+    });
     _searchController.addListener(() {
       setState(() {
         _searchQuery = _searchController.text.toLowerCase();
@@ -38,6 +48,7 @@ class _AuctionListPageState extends State<AuctionListPage> {
 
   @override
   void dispose() {
+    _auctionEventSubscription?.cancel();
     _searchController.dispose();
     super.dispose();
   }
@@ -56,171 +67,171 @@ class _AuctionListPageState extends State<AuctionListPage> {
         child: CustomScrollView(
           physics: const AlwaysScrollableScrollPhysics(),
           slivers: [
-              // Search Bar Section
-              SliverToBoxAdapter(
-                child: Padding(
-                  padding: const EdgeInsets.all(20),
-                  child: _buildSearchBar(),
-                ),
+            // Search Bar Section
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.all(20),
+                child: _buildSearchBar(),
               ),
+            ),
 
-              // Category Section
-              SliverToBoxAdapter(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 20),
-                      child: Text(
-                        'Danh mục',
-                        style: AppTextStyles.h3.copyWith(
-                          color: AppColors.black,
-                          fontWeight: FontWeight.bold,
-                        ),
+            // Category Section
+            SliverToBoxAdapter(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    child: Text(
+                      'Danh mục',
+                      style: AppTextStyles.h3.copyWith(
+                        color: AppColors.black,
+                        fontWeight: FontWeight.bold,
                       ),
                     ),
-                    const SizedBox(height: 12),
-                    _buildCategoryList(),
-                    const SizedBox(height: 24),
-                  ],
-                ),
+                  ),
+                  const SizedBox(height: 12),
+                  _buildCategoryList(),
+                  const SizedBox(height: 24),
+                ],
               ),
+            ),
 
-              // Auction Grid
-              BlocBuilder<AuctionBloc, AuctionState>(
-                builder: (context, state) {
-                  if (state is AuctionLoading) {
-                    return const SliverFillRemaining(
-                      child: Center(child: CircularProgressIndicator()),
-                    );
-                  } else if (state is AuctionError) {
+            // Auction Grid
+            BlocBuilder<AuctionBloc, AuctionState>(
+              builder: (context, state) {
+                if (state is AuctionLoading) {
+                  return const SliverFillRemaining(
+                    child: Center(child: CircularProgressIndicator()),
+                  );
+                } else if (state is AuctionError) {
+                  return SliverFillRemaining(
+                    child: Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const Icon(
+                            Icons.error_outline,
+                            size: 48,
+                            color: AppColors.black,
+                          ),
+                          const SizedBox(height: 16),
+                          Text(state.message, style: AppTextStyles.bodyMedium),
+                          const SizedBox(height: 16),
+                          ElevatedButton(
+                            onPressed: () {
+                              context.read<AuctionBloc>().add(
+                                RefreshAuctions(),
+                              );
+                            },
+                            child: const Text('Thử lại'),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                } else if (state is AuctionLoaded) {
+                  // Filter auctions by selected category and search query
+                  var filteredAuctions = state.auctions;
+
+                  // Filter by category
+                  if (_selectedCategoryId != null) {
+                    filteredAuctions = filteredAuctions
+                        .where(
+                          (auction) =>
+                              auction.categoryId == _selectedCategoryId,
+                        )
+                        .toList();
+                  }
+
+                  // Filter by search query
+                  if (_searchQuery.isNotEmpty) {
+                    filteredAuctions = filteredAuctions.where((auction) {
+                      final titleLower = auction.title.toLowerCase();
+                      final descLower = auction.description.toLowerCase();
+                      return titleLower.contains(_searchQuery) ||
+                          descLower.contains(_searchQuery);
+                    }).toList();
+                  }
+
+                  if (filteredAuctions.isEmpty) {
                     return SliverFillRemaining(
                       child: Center(
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            const Icon(
-                              Icons.error_outline,
-                              size: 48,
-                              color: AppColors.black,
+                            Icon(
+                              Icons.inbox_outlined,
+                              size: 64,
+                              color: AppColors.grey.withOpacity(0.5),
                             ),
                             const SizedBox(height: 16),
                             Text(
-                              state.message,
-                              style: AppTextStyles.bodyMedium,
-                            ),
-                            const SizedBox(height: 16),
-                            ElevatedButton(
-                              onPressed: () {
-                                context.read<AuctionBloc>().add(
-                                      RefreshAuctions(),
-                                    );
-                              },
-                              child: const Text('Thử lại'),
+                              _searchQuery.isNotEmpty
+                                  ? 'Không tìm thấy phiên đấu giá cho "$_searchQuery"'
+                                  : _selectedCategoryId != null
+                                  ? 'Không có phiên đấu giá nào trong danh mục này'
+                                  : 'Hiện chưa có phiên đấu giá đang diễn ra',
+                              textAlign: TextAlign.center,
+                              style: AppTextStyles.bodyMedium.copyWith(
+                                color: AppColors.grey,
+                              ),
                             ),
                           ],
                         ),
                       ),
                     );
-                  } else if (state is AuctionLoaded) {
-                    // Filter auctions by selected category and search query
-                    var filteredAuctions = state.auctions;
-
-                    // Filter by category
-                    if (_selectedCategoryId != null) {
-                      filteredAuctions = filteredAuctions
-                          .where((auction) =>
-                              auction.categoryId == _selectedCategoryId)
-                          .toList();
-                    }
-
-                    // Filter by search query
-                    if (_searchQuery.isNotEmpty) {
-                      filteredAuctions = filteredAuctions.where((auction) {
-                        final titleLower = auction.title.toLowerCase();
-                        final descLower = auction.description.toLowerCase();
-                        return titleLower.contains(_searchQuery) ||
-                            descLower.contains(_searchQuery);
-                      }).toList();
-                    }
-
-                    if (filteredAuctions.isEmpty) {
-                      return SliverFillRemaining(
-                        child: Center(
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(
-                                Icons.inbox_outlined,
-                                size: 64,
-                                color: AppColors.grey.withOpacity(0.5),
-                              ),
-                              const SizedBox(height: 16),
-                              Text(
-                                _searchQuery.isNotEmpty
-                                    ? 'Không tìm thấy phiên đấu giá cho "$_searchQuery"'
-                                    : _selectedCategoryId != null
-                                        ? 'Không có phiên đấu giá nào trong danh mục này'
-                                        : 'Hiện chưa có phiên đấu giá đang diễn ra',
-                                textAlign: TextAlign.center,
-                                style: AppTextStyles.bodyMedium.copyWith(
-                                  color: AppColors.grey,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      );
-                    } else {
-                      return SliverPadding(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 20,
-                          vertical: 0,
-                        ),
-                        sliver: SliverGrid(
-                          gridDelegate:
-                              const SliverGridDelegateWithFixedCrossAxisCount(
-                            crossAxisCount: 2,
-                            childAspectRatio: 0.6,
-                            crossAxisSpacing: 16,
-                            mainAxisSpacing: 16,
-                          ),
-                          delegate: SliverChildBuilderDelegate(
-                            (context, index) {
-                              final auction = filteredAuctions[index];
-                              return AuctionCard(
-                                auctionId: auction.auctionId,
-                                title: auction.title,
-                                imageUrl: auction.images.isNotEmpty
-                                    ? auction.images.first
-                                    : null,
-                                currentBid: auction.formattedCurrentPrice,
-                                timeLeft: _calculateTimeLeft(auction.endTime),
-                                bidCount: auction.bidCount,
-                                sellerName: auction.sellerName,
-                                onTap: () {
-                                  context.go(
-                                    '${AppRoutes.auctionDetail}/${auction.auctionId}',
-                                  );
-                                },
+                  } else {
+                    return SliverPadding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 20,
+                        vertical: 0,
+                      ),
+                      sliver: SliverGrid(
+                        gridDelegate:
+                            const SliverGridDelegateWithFixedCrossAxisCount(
+                              crossAxisCount: 2,
+                              childAspectRatio: 0.6,
+                              crossAxisSpacing: 16,
+                              mainAxisSpacing: 16,
+                            ),
+                        delegate: SliverChildBuilderDelegate((context, index) {
+                          final auction = filteredAuctions[index];
+                          return AuctionCard(
+                            auctionId: auction.auctionId,
+                            title: auction.title,
+                            imageUrl: auction.images.isNotEmpty
+                                ? auction.images.first
+                                : null,
+                            currentBid: auction.formattedCurrentPrice,
+                            timeLeft: _calculateTimeLeft(
+                              auction.startTime,
+                              auction.endTime,
+                              auction.status,
+                            ),
+                            bidCount: auction.bidCount,
+                            sellerName: auction.sellerName,
+                            onTap: () {
+                              context.go(
+                                '${AppRoutes.auctionDetail}/${auction.auctionId}',
                               );
                             },
-                            childCount: filteredAuctions.length,
-                          ),
-                        ),
-                      );
-                    }
+                          );
+                        }, childCount: filteredAuctions.length),
+                      ),
+                    );
                   }
-                  return const SliverToBoxAdapter(child: SizedBox.shrink());
-                },
-              ),
+                }
+                return const SliverToBoxAdapter(child: SizedBox.shrink());
+              },
+            ),
 
-              // Bottom Padding
-              const SliverToBoxAdapter(child: SizedBox(height: 40)),
-            ],
-          ),
+            // Bottom Padding
+            const SliverToBoxAdapter(child: SizedBox(height: 40)),
+          ],
         ),
-      );
+      ),
+    );
   }
 
   PreferredSizeWidget _buildAppBar() {
@@ -387,11 +398,14 @@ class _AuctionListPageState extends State<AuctionListPage> {
     return Icons.category; // default
   }
 
-  String _calculateTimeLeft(DateTime endTime) {
-    final now = DateTime.now();
-    final difference = endTime.difference(now);
-
-    if (difference.isNegative) {
+  String _calculateTimeLeft(
+    DateTime? startTime,
+    DateTime endTime,
+    String status,
+  ) {
+    final now = ServerTimeService().now;
+    if (status == 'APPROVED' && startTime != null && now.isBefore(startTime)) {
+      return 'Bắt đầu ${AppLocalizations.formatTimeLeft(startTime)}';
     }
     return AppLocalizations.formatTimeLeft(endTime);
   }

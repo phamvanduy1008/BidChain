@@ -19,6 +19,7 @@ contract Auction {
         string metadataUrl;
         uint256 startPriceWei;      // Starting price in Wei
         uint256 stepPriceWei;       // Step price in Wei
+        uint256 startTime;
         uint256 endTime;
         bool ended;
         bool settled;
@@ -54,6 +55,7 @@ contract Auction {
         address indexed seller,
         uint256 startPriceWei,
         uint256 stepPriceWei,
+        uint256 startTime,
         uint256 endTime,
         string metadataUrl
     );
@@ -121,9 +123,10 @@ contract Auction {
     }
 
     /**
-     * @notice Create new auction metadata on-chain
+    * @notice Create new auction metadata on-chain
      * @param _startPriceWei Starting price in Wei
      * @param _stepPriceWei Step price in Wei
+     * @param _startTime Scheduled start time in unix seconds
      * @param _durationInSeconds Auction duration
      * @param _metadataUrl IPFS metadata URL
      * @return auctionId The ID of created auction
@@ -131,6 +134,7 @@ contract Auction {
     function createAuction(
         uint256 _startPriceWei,
         uint256 _stepPriceWei,
+        uint256 _startTime,
         uint256 _durationInSeconds,
         string memory _metadataUrl
     )
@@ -139,6 +143,7 @@ contract Auction {
     {
         require(_startPriceWei > 0, "Invalid start price");
         require(_stepPriceWei > 0, "Invalid step price");
+        require(_startTime >= block.timestamp, "Invalid start time");
         require(_durationInSeconds >= 300, "Duration too short"); // Min 5 minutes
 
         auctionCount++;
@@ -149,7 +154,8 @@ contract Auction {
             metadataUrl: _metadataUrl,
             startPriceWei: _startPriceWei,
             stepPriceWei: _stepPriceWei,
-            endTime: block.timestamp + _durationInSeconds,
+            startTime: _startTime,
+            endTime: _startTime + _durationInSeconds,
             ended: false,
             settled: false,
             winner: address(0),
@@ -163,7 +169,8 @@ contract Auction {
             msg.sender,
             _startPriceWei,
             _stepPriceWei,
-            block.timestamp + _durationInSeconds,
+            _startTime,
+            _startTime + _durationInSeconds,
             _metadataUrl
         );
 
@@ -402,7 +409,9 @@ contract Auction {
         returns (bool)
     {
         AuctionMetadata memory auction = auctions[_auctionId];
-        return !auction.ended && block.timestamp < auction.endTime;
+        return !auction.ended
+            && block.timestamp >= auction.startTime
+            && block.timestamp < auction.endTime;
     }
 
     /**

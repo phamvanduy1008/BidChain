@@ -45,10 +45,13 @@ class AuctionRemoteDataSourceImpl implements AuctionRemoteDataSource {
           }
           return auctions;
         } else if (response.data is Map && response.data['data'] is List) {
-           final list = response.data['data'] as List;
-           return list.map((e) => AuctionModel.fromJson(e)).toList();
+          final list = response.data['data'] as List;
+          return list.map((e) => AuctionModel.fromJson(e)).toList();
         } else {
-           throw ServerException(message: 'Invalid response format: Expected List but got ${response.data.runtimeType}');
+          throw ServerException(
+            message:
+                'Invalid response format: Expected List but got ${response.data.runtimeType}',
+          );
         }
       } else {
         throw ServerException(
@@ -90,7 +93,9 @@ class AuctionRemoteDataSourceImpl implements AuctionRemoteDataSource {
       );
 
       if (response.statusCode == 200 || response.statusCode == 201) {
-        return response.data['auctionId']?.toString() ?? '';
+        return response.data['auctionId']?.toString() ??
+            response.data['auction']?['id']?.toString() ??
+            '';
       } else {
         throw ServerException(
           message: response.data['error'] ?? 'Failed to create auction',

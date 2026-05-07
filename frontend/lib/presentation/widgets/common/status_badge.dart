@@ -43,86 +43,56 @@ class StatusBadge extends StatelessWidget {
       case 'PENDING_APPROVAL':
         return _StatusConfig(
           label: 'Chờ duyệt',
-          backgroundColor: const Color(
-            0xFFFFA726,
-          ).withOpacity(0.95), // Warm Orange
+          backgroundColor: const Color(0xFFFFA726).withOpacity(0.95),
           borderColor: const Color(0xFFFF9800),
           textColor: Colors.white,
         );
       case 'APPROVED':
         return _StatusConfig(
-          label: 'Đã duyệt',
-          backgroundColor: const Color(
-            0xFF42A5F5,
-          ).withOpacity(0.95), // Bright Blue
+          label: 'Sắp diễn ra',
+          backgroundColor: const Color(0xFF42A5F5).withOpacity(0.95),
           borderColor: const Color(0xFF2196F3),
           textColor: Colors.white,
         );
       case 'ACTIVE':
         return _StatusConfig(
           label: 'Đang diễn ra',
-          backgroundColor: const Color(
-            0xFF66BB6A,
-          ).withOpacity(0.95), // Bright Green
+          backgroundColor: const Color(0xFF66BB6A).withOpacity(0.95),
           borderColor: const Color(0xFF4CAF50),
           textColor: Colors.white,
         );
       case 'ENDED':
         return _StatusConfig(
           label: 'Đã kết thúc',
-          backgroundColor: const Color(
-            0xFF78909C,
-          ).withOpacity(0.95), // Blue Grey
+          backgroundColor: const Color(0xFF78909C).withOpacity(0.95),
           borderColor: const Color(0xFF607D8B),
           textColor: Colors.white,
         );
       case 'SETTLED':
         return _StatusConfig(
           label: 'Đã thanh toán',
-          backgroundColor: const Color(0xFF9C27B0).withOpacity(0.95), // Purple
+          backgroundColor: const Color(0xFF9C27B0).withOpacity(0.95),
           borderColor: const Color(0xFF7B1FA2),
           textColor: Colors.white,
         );
       case 'REJECTED':
         return _StatusConfig(
           label: 'Bị từ chối',
-          backgroundColor: const Color(
-            0xFFEF5350,
-          ).withOpacity(0.95), // Bright Red
+          backgroundColor: const Color(0xFFEF5350).withOpacity(0.95),
           borderColor: const Color(0xFFF44336),
           textColor: Colors.white,
         );
-      case 'WINNING':
+      case 'WAITING_CONFIRMATION':
         return _StatusConfig(
-          label: 'Đang thắng',
-          backgroundColor: const Color(
-            0xFF66BB6A,
-          ).withOpacity(0.95), // Bright Green
-          borderColor: const Color(0xFF4CAF50),
-          textColor: Colors.white,
-        );
-      case 'OUTBID':
-        return _StatusConfig(
-          label: 'Bị vượt giá',
-          backgroundColor: const Color(
-            0xFFFF7043,
-          ).withOpacity(0.95), // Deep Orange
-          borderColor: const Color(0xFFFF5722),
-          textColor: Colors.white,
-        );
-      case 'VALID':
-        return _StatusConfig(
-          label: 'Hợp lệ',
-          backgroundColor: const Color(
-            0xFF42A5F5,
-          ).withOpacity(0.95), // Bright Blue
-          borderColor: const Color(0xFF2196F3),
+          label: 'Chờ xác nhận',
+          backgroundColor: const Color(0xFFFFB300).withOpacity(0.95),
+          borderColor: const Color(0xFFFF8F00),
           textColor: Colors.white,
         );
       default:
         return _StatusConfig(
           label: AppLocalizations.translateStatus(status),
-          backgroundColor: const Color(0xFF9E9E9E).withOpacity(0.95), // Grey
+          backgroundColor: const Color(0xFF9E9E9E).withOpacity(0.95),
           borderColor: const Color(0xFF757575),
           textColor: Colors.white,
         );

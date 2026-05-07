@@ -1,6 +1,8 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:frontend/config/routes/app_routes.dart';
+import 'package:frontend/core/services/socket_service.dart';
 import 'package:go_router/go_router.dart';
 import '../../../config/theme/app_colors.dart';
 import '../../../config/theme/app_text_styles.dart';
@@ -33,20 +35,110 @@ class AuctionDetailPage extends StatefulWidget {
 }
 
 class _AuctionDetailPageState extends State<AuctionDetailPage> {
+  final SocketService _socketService = SocketService();
+  StreamSubscription<Map<String, dynamic>>? _auctionEventSubscription;
+
   @override
   void initState() {
     super.initState();
-    // Dispatch event to load auction details when page initializes
     context.read<AuctionDetailBloc>().add(
       LoadAuctionDetail(auctionId: widget.auctionId),
     );
+    _socketService.joinAuctionRoom(widget.auctionId);
+    _auctionEventSubscription = _socketService.auctionEventStream.listen(
+      _handleAuctionEvent,
+    );
   }
 
-  /// Open chat with auction context
+  @override
+  void dispose() {
+    _auctionEventSubscription?.cancel();
+    _socketService.leaveAuctionRoom(widget.auctionId);
+    super.dispose();
+  }
+
+  // ==================== SOCKET EVENT HANDLERS ====================
+
+  void _handleAuctionEvent(Map<String, dynamic> event) {
+    if (!mounted || event['auction_id']?.toString() != widget.auctionId) {
+      return;
+    }
+
+    final eventName = event['event_name']?.toString();
+
+    // Refresh auction data
+    context.read<AuctionDetailBloc>().add(
+      RefreshAuctionDetail(auctionId: widget.auctionId),
+    );
+
+    if (eventName == 'user_outbid') {
+      _showOutbidDialog();
+      return;
+    }
+
+    if (eventName == 'auction_ended') {
+      final authState = context.read<AuthBloc>().state;
+      if (authState is AuthSuccessState) {
+        final winnerId = event['winner_id']?.toString();
+        final isWinner = winnerId != null && winnerId == authState.user.id;
+        _showAuctionEndedDialog(isWinner: isWinner);
+      }
+    }
+  }
+
+  void _showOutbidDialog() {
+    showDialog(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Bạn đã bị vượt giá'),
+        content: const Text(
+          'Có người đã đặt giá cao hơn bạn. Bạn có muốn tiếp tục nâng giá không?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Để sau'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(dialogContext);
+              final state = context.read<AuctionDetailBloc>().state;
+              if (state is AuctionDetailLoaded) {
+                _showPlaceBidDialog(context, state.auction);
+              }
+            },
+            child: const Text('Tiếp tục ra giá'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showAuctionEndedDialog({required bool isWinner}) {
+    final message = isWinner
+        ? 'Bạn đã là người chiến thắng'
+        : 'Phiên đấu giá đã kết thúc. Bạn không phải là người chiến thắng.';
+
+    showDialog(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text(isWinner ? 'Kết quả đấu giá' : 'Phiên đấu giá kết thúc'),
+        content: Text(message),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Đóng'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ==================== CHAT ====================
+
   void _openChatWithContext(BuildContext context, AuctionDetailState state) {
-    // Extract auction data from state
     Map<String, dynamic>? auctionData;
-    
+
     if (state is AuctionDetailLoaded) {
       final auction = state.auction;
       auctionData = {
@@ -64,8 +156,6 @@ class _AuctionDetailPageState extends State<AuctionDetailPage> {
       };
     }
 
-
-    // Show chat dialog
     showDialog(
       context: context,
       barrierDismissible: true,
@@ -103,7 +193,6 @@ class _AuctionDetailPageState extends State<AuctionDetailPage> {
               behavior: SnackBarBehavior.floating,
             ),
           );
-          // Refresh user balance after successful bid
           context.read<AuthBloc>().add(const AuthCheckStatusEvent());
         } else if (state is BidError) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -138,7 +227,6 @@ class _AuctionDetailPageState extends State<AuctionDetailPage> {
             title: 'Chi tiết đấu giá',
             leading: const CustomBackButton(color: AppColors.accent),
             actions: [
-              // Chat with AI button
               IconButton(
                 icon: const Icon(Icons.smart_toy_outlined),
                 color: AppColors.accent,
@@ -172,18 +260,13 @@ class _AuctionDetailPageState extends State<AuctionDetailPage> {
   bool _isWinner(BuildContext context, auction) {
     final authState = context.read<AuthBloc>().state;
     if (authState is AuthSuccessState) {
-      // Assuming auction has highestBidderId field
       return authState.user.id == auction.highestBidderId;
     }
     return false;
   }
 
   void _showConfirmDialog(BuildContext context, auction) {
-    print('🟡 DIALOG: Showing confirm dialog');
-    // Capture the Bloc reference BEFORE showing the dialog
-    // This ensures we use the same Bloc instance that the page is using (which is Loaded)
     final bloc = context.read<AuctionDetailBloc>();
-    print('🟡 DIALOG: Bloc state before dialog = ${bloc.state}');
 
     showDialog(
       context: context,
@@ -194,19 +277,12 @@ class _AuctionDetailPageState extends State<AuctionDetailPage> {
         ),
         actions: [
           TextButton(
-            onPressed: () {
-              print('🟡 DIALOG: Cancel pressed');
-              Navigator.pop(dialogContext);
-            },
+            onPressed: () => Navigator.pop(dialogContext),
             child: const Text('Hủy'),
           ),
           ElevatedButton(
             onPressed: () {
-              print(
-                '🟡 DIALOG: Confirm pressed - dispatching ConfirmReceiptEvent',
-              );
               Navigator.pop(dialogContext);
-              // Use the captured Bloc reference instead of context.read
               bloc.add(ConfirmReceiptEvent(widget.auctionId));
             },
             style: ElevatedButton.styleFrom(
@@ -290,15 +366,12 @@ class _AuctionDetailPageState extends State<AuctionDetailPage> {
         child: ListView(
           physics: const AlwaysScrollableScrollPhysics(),
           children: [
-            // Image Gallery
             ImageGallery(images: auction.images),
-
             Padding(
               padding: const EdgeInsets.all(16),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Status Badge
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -306,14 +379,18 @@ class _AuctionDetailPageState extends State<AuctionDetailPage> {
                       const SizedBox(height: 8),
                       Align(
                         alignment: Alignment.centerRight,
-                        child: CountdownTimer(endTime: auction.endTime),
+                        child: CountdownTimer(
+                          startTime: auction.startTime,
+                          endTime: auction.endTime,
+                          status: auction.status,
+                        ),
                       ),
                     ],
                   ),
 
-                  // Owner Badge
                   if (_isAuctionCreator(context, auction.sellerId)) ...[
                     const SizedBox(height: 16),
+                    // Owner badge
                     Container(
                       width: double.infinity,
                       padding: const EdgeInsets.all(16),
@@ -321,7 +398,7 @@ class _AuctionDetailPageState extends State<AuctionDetailPage> {
                         color: AppColors.secondary,
                         borderRadius: BorderRadius.circular(12),
                         border: Border.all(
-                          color: AppColors.accent.withValues(alpha: 0.1 / 1.0),
+                          color: AppColors.accent.withValues(alpha: 0.1),
                           width: 1,
                         ),
                       ),
@@ -387,14 +464,12 @@ class _AuctionDetailPageState extends State<AuctionDetailPage> {
                   ],
                   const SizedBox(height: 16),
 
-                  // Title
                   Text(
                     auction.title,
                     style: AppTextStyles.h2.copyWith(color: AppColors.accent),
                   ),
                   const SizedBox(height: 12),
 
-                  // Description
                   ExpandableInlineText(
                     text: auction.description,
                     maxLines: 5,
@@ -409,8 +484,6 @@ class _AuctionDetailPageState extends State<AuctionDetailPage> {
                   ),
 
                   const SizedBox(height: 20),
-
-                  // Seller Info
                   SellerInfoCard(
                     sellerId: auction.sellerId,
                     sellerName: auction.sellerName,
@@ -421,13 +494,10 @@ class _AuctionDetailPageState extends State<AuctionDetailPage> {
                   ),
                   const SizedBox(height: 20),
 
-                  // Price Information
                   _buildPriceInfo(auction),
                   const SizedBox(height: 24),
-
-                  // Bid History
                   _buildBidHistory(auction),
-                  const SizedBox(height: 80), // Space for FAB
+                  const SizedBox(height: 80),
                 ],
               ),
             ),
@@ -549,9 +619,11 @@ class _AuctionDetailPageState extends State<AuctionDetailPage> {
       builder: (dialogContext) => PlaceBidDialog(
         currentPrice: auction.currentPriceVnd,
         stepPrice: auction.stepPriceVnd,
+        startTime: auction.startTime,
         formattedCurrentPrice: auction.formattedCurrentPrice,
         formattedStepPrice: auction.formattedStepPrice,
         endTime: auction.endTime,
+        status: auction.status,
         onPlaceBid: (amount) {
           context.read<AuctionDetailBloc>().add(
             PlaceBid(auctionId: widget.auctionId, amountVnd: amount),
@@ -569,7 +641,6 @@ class _AuctionDetailPageState extends State<AuctionDetailPage> {
 
     final auction = state.auction;
 
-    // 1. Active auction + Not creator -> Place Bid
     if (auction.isActive && !_isAuctionCreator(context, auction.sellerId)) {
       return FloatingActionButton.extended(
         onPressed: () => _showPlaceBidDialog(context, auction),
@@ -582,15 +653,23 @@ class _AuctionDetailPageState extends State<AuctionDetailPage> {
       );
     }
 
-    // 2. Waiting Confirmation + Winner -> Confirm Receipt
+    if (auction.status == 'APPROVED' &&
+        !_isAuctionCreator(context, auction.sellerId)) {
+      return FloatingActionButton.extended(
+        onPressed: null,
+        backgroundColor: AppColors.grey,
+        icon: const Icon(Icons.schedule, color: AppColors.white),
+        label: Text(
+          'Chưa tới giờ bắt đầu',
+          style: AppTextStyles.labelLarge.copyWith(color: AppColors.white),
+        ),
+      );
+    }
+
     if (auction.status == 'WAITING_CONFIRMATION' &&
         _isWinner(context, auction)) {
-      print('🟡 BUTTON: Showing "Xác nhận đã nhận hàng" button');
       return FloatingActionButton.extended(
-        onPressed: () {
-          print('🟡 BUTTON: "Xác nhận đã nhận hàng" pressed!');
-          _showConfirmDialog(context, auction);
-        },
+        onPressed: () => _showConfirmDialog(context, auction),
         backgroundColor: AppColors.success,
         icon: const Icon(Icons.check_circle, color: AppColors.white),
         label: Text(
@@ -600,11 +679,10 @@ class _AuctionDetailPageState extends State<AuctionDetailPage> {
       );
     }
 
-    // 3. Settled/Confirmed + Winner -> Order Received (Disabled)
     if ((auction.status == 'SETTLED' || auction.status == 'CONFIRMED') &&
         _isWinner(context, auction)) {
       return FloatingActionButton.extended(
-        onPressed: null, // Disabled
+        onPressed: null,
         backgroundColor: AppColors.grey,
         icon: const Icon(Icons.check_circle_outline, color: AppColors.white),
         label: Text(

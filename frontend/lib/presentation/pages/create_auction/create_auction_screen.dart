@@ -38,6 +38,7 @@ class _CreateAuctionViewState extends State<_CreateAuctionView> {
   final _descriptionController = TextEditingController();
   final _startPriceController = TextEditingController();
   final _stepPriceController = TextEditingController();
+  DateTime? _startTime;
   DateTime? _endTime;
   String? _selectedCategoryId;
   final List<File> _selectedImages = [];
@@ -200,8 +201,19 @@ class _CreateAuctionViewState extends State<_CreateAuctionView> {
               keyboardType: TextInputType.number,
             ),
             const SizedBox(height: 20),
+            _buildLabel('Thời gian bắt đầu'),
+            _buildDatePicker(
+              selectedTime: _startTime,
+              placeholder: 'Chọn ngày và giờ bắt đầu',
+              onTap: () => _selectDateTime(isStartTime: true),
+            ),
+            const SizedBox(height: 20),
             _buildLabel('Thời gian kết thúc'),
-            _buildDatePicker(context),
+            _buildDatePicker(
+              selectedTime: _endTime,
+              placeholder: 'Chọn ngày và giờ kết thúc',
+              onTap: () => _selectDateTime(isStartTime: false),
+            ),
             const SizedBox(height: 20),
             if (_selectedImages.isEmpty) _buildImageUploadPlaceholder(),
             if (_selectedImages.isNotEmpty) _buildImagePreview(),
@@ -286,9 +298,13 @@ class _CreateAuctionViewState extends State<_CreateAuctionView> {
     );
   }
 
-  Widget _buildDatePicker(BuildContext context) {
+  Widget _buildDatePicker({
+    required DateTime? selectedTime,
+    required String placeholder,
+    required VoidCallback onTap,
+  }) {
     return InkWell(
-      onTap: _selectDateTime,
+      onTap: onTap,
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
         decoration: BoxDecoration(
@@ -300,12 +316,12 @@ class _CreateAuctionViewState extends State<_CreateAuctionView> {
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             Text(
-              _endTime != null
-                  ? DateFormat('yyyy-MM-dd HH:mm').format(_endTime!)
-                  : 'Chọn ngày và giờ',
+              selectedTime != null
+                  ? DateFormat('yyyy-MM-dd HH:mm').format(selectedTime)
+                  : placeholder,
               style: TextStyle(
                 fontSize: 14,
-                color: _endTime != null ? AppColors.black : AppColors.grey,
+                color: selectedTime != null ? AppColors.black : AppColors.grey,
               ),
             ),
             Icon(Icons.calendar_today, color: AppColors.grey, size: 18),
@@ -315,27 +331,40 @@ class _CreateAuctionViewState extends State<_CreateAuctionView> {
     );
   }
 
-  Future<void> _selectDateTime() async {
+  Future<void> _selectDateTime({required bool isStartTime}) async {
+    final initialBase = isStartTime
+        ? (_startTime ?? DateTime.now().add(const Duration(minutes: 10)))
+        : (_endTime ??
+              _startTime?.add(const Duration(hours: 1)) ??
+              DateTime.now().add(const Duration(hours: 1)));
     final date = await showDatePicker(
       context: context,
-      initialDate: DateTime.now(),
+      initialDate: initialBase,
       firstDate: DateTime.now(),
       lastDate: DateTime.now().add(const Duration(days: 365)),
     );
     if (date != null && mounted) {
       final time = await showTimePicker(
         context: context,
-        initialTime: TimeOfDay.now(),
+        initialTime: TimeOfDay.fromDateTime(initialBase),
       );
       if (time != null && mounted) {
+        final selected = DateTime(
+          date.year,
+          date.month,
+          date.day,
+          time.hour,
+          time.minute,
+        );
         setState(() {
-          _endTime = DateTime(
-            date.year,
-            date.month,
-            date.day,
-            time.hour,
-            time.minute,
-          );
+          if (isStartTime) {
+            _startTime = selected;
+            if (_endTime != null && !_endTime!.isAfter(selected)) {
+              _endTime = selected.add(const Duration(hours: 1));
+            }
+          } else {
+            _endTime = selected;
+          }
         });
       }
     }
@@ -489,6 +518,7 @@ class _CreateAuctionViewState extends State<_CreateAuctionView> {
       description: _descriptionController.text,
       startPrice: double.tryParse(_startPriceController.text) ?? 0,
       stepPrice: double.tryParse(_stepPriceController.text) ?? 0,
+      startTime: _startTime!,
       endTime: _endTime!,
       images: _imageUrls,
       categoryId: _selectedCategoryId!,
@@ -508,8 +538,18 @@ class _CreateAuctionViewState extends State<_CreateAuctionView> {
       return false;
     }
 
+    if (_startTime == null) {
+      _showSnackBar(context, 'Vui lòng chọn thời gian bắt đầu');
+      return false;
+    }
+
     if (_endTime == null) {
       _showSnackBar(context, 'Vui lòng chọn thời gian kết thúc');
+      return false;
+    }
+
+    if (!_endTime!.isAfter(_startTime!)) {
+      _showSnackBar(context, 'Thời gian kết thúc phải sau thời gian bắt đầu');
       return false;
     }
 
