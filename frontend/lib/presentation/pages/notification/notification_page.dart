@@ -136,6 +136,8 @@ class _NotificationPageState extends State<NotificationPage> {
         return Icons.gavel;
       case 'NEW_BID':
         return Icons.monetization_on;
+      case 'AUCTION_LOST':
+        return Icons.sentiment_dissatisfied_outlined;
       case 'AUCTION_SOLD':
       case 'WON_AUCTION':
         return Icons.emoji_events;
@@ -156,6 +158,7 @@ class _NotificationPageState extends State<NotificationPage> {
     switch (type) {
       case 'OUTBID':
       case 'AUCTION_REJECTED':
+      case 'AUCTION_LOST':
         return Colors.red;
       case 'NEW_BID':
       case 'DEPOSIT_SUCCESS':

@@ -33,6 +33,20 @@ class AuctionRepositoryImpl implements AuctionRepository {
   }
 
   @override
+  Future<Either<Failure, List<AuctionEntity>>> getActiveAuctions() async {
+    if (await networkInfo.isConnected) {
+      try {
+        final remoteAuctions = await remoteDataSource.getActiveAuctions();
+        return Right(remoteAuctions);
+      } on ServerException catch (e) {
+        return Left(ServerFailure(message: e.message));
+      }
+    } else {
+      return Left(NetworkFailure(message: "No internet connection"));
+    }
+  }
+
+  @override
   Future<Either<Failure, AuctionEntity>> getAuctionDetail(
     String auctionId,
   ) async {

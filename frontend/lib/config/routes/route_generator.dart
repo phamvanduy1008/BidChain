@@ -15,6 +15,7 @@ import '../../presentation/pages/profile/profile_page.dart';
 import '../../presentation/pages/profile/public_profile_page.dart';
 import '../../presentation/pages/profile/edit_profile_page.dart';
 import '../../presentation/pages/notification/notification_page.dart';
+import '../../presentation/widgets/app/global_socket_listener.dart';
 import 'app_routes.dart';
 
 final GoRouter appRouter = GoRouter(
@@ -48,7 +49,7 @@ final GoRouter appRouter = GoRouter(
               create: (context) => InjectionContainer.getNotificationBloc(),
             ),
           ],
-          child: child, // child = currently active nested route
+          child: GlobalSocketListener(child: child),
         );
       },
       routes: [

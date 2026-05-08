@@ -16,23 +16,29 @@ class AuctionBloc extends Bloc<AuctionEvent, AuctionState> {
     Emitter<AuctionState> emit,
   ) async {
     emit(AuctionLoading());
-    final result = await repository.getAuctions();
-    result.fold(
-      (failure) => emit(AuctionError(failure.message)),
-      (auctions) => emit(AuctionLoaded(auctions)),
-    );
+    await _loadAuctionData(emit);
   }
 
   Future<void> _onRefreshAuctions(
     RefreshAuctions event,
     Emitter<AuctionState> emit,
   ) async {
-    // Keep current state or show loading overlay if needed
-    // For now, we just reload
-    final result = await repository.getAuctions();
-    result.fold(
+    await _loadAuctionData(emit);
+  }
+
+  Future<void> _loadAuctionData(Emitter<AuctionState> emit) async {
+    final allResult = await repository.getAuctions();
+    final activeResult = await repository.getActiveAuctions();
+
+    allResult.fold(
       (failure) => emit(AuctionError(failure.message)),
-      (auctions) => emit(AuctionLoaded(auctions)),
+      (auctions) {
+        activeResult.fold(
+          (failure) => emit(AuctionError(failure.message)),
+          (activeAuctions) =>
+              emit(AuctionLoaded(auctions, activeAuctions: activeAuctions)),
+        );
+      },
     );
   }
 }
