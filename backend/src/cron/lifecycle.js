@@ -1,8 +1,45 @@
+const fs = require("fs");
+const path = require("path");
+const ethers = require("ethers");
 const Auction = require("../models/Auction");
 const Notification = require("../models/Notification");
 const { AUCTION_STATUS } = require("../config/constants");
 const { weiToVnd, formatVnd } = require("../utils/conversion");
 const { getCurrentAuctionTime } = require("../utils/auctionTime");
+const { provider, walletFromPrivateKey } = require("../blockchain/contract");
+
+function getAuctionAbi() {
+    const abiPath = process.env.CONTRACT_ABI_PATH || "./abi/Auction.json";
+    const abiRaw = fs.readFileSync(path.resolve(abiPath), "utf8");
+    const abiParsed = JSON.parse(abiRaw);
+    return abiParsed.abi || abiParsed;
+}
+
+function getAuctionContractAt(contractAddress, signerOrProvider = provider) {
+    return new ethers.Contract(contractAddress, getAuctionAbi(), signerOrProvider);
+}
+
+async function mirrorAuctionEndedOnChain(auction) {
+    if (!auction.contract_address || !auction.blockchain_id) {
+        return;
+    }
+
+    try {
+        const deployer = walletFromPrivateKey(process.env.DEPLOYER_PRIVATE_KEY);
+        const auctionContract = getAuctionContractAt(auction.contract_address, deployer);
+        const onChainAuction = await auctionContract.getAuction(auction.blockchain_id);
+
+        if (onChainAuction.ended) {
+            return;
+        }
+
+        const tx = await auctionContract.endAuction(auction.blockchain_id);
+        await tx.wait();
+        console.log(`Auction ${auction._id} mirrored as ended on-chain`);
+    } catch (error) {
+        console.warn(`Failed to mirror ended state for auction ${auction._id}: ${error.message}`);
+    }
+}
 
 function emitAuctionState(io, auction, eventName, extra = {}) {
     if (!io) {
@@ -61,12 +98,13 @@ async function transitionEndedAuctions(io, chainNow) {
     }).populate("seller_id highest_bidder_id");
 
     for (const auction of auctionsToEnd) {
-        const nextStatus = auction.highest_bidder_id
-            ? AUCTION_STATUS.WAITING_CONFIRMATION
-            : AUCTION_STATUS.ENDED;
+        const nextStatus = AUCTION_STATUS.ENDED;
+
+        await mirrorAuctionEndedOnChain(auction);
 
         await Auction.findByIdAndUpdate(auction._id, {
-            status: nextStatus
+            status: nextStatus,
+            settled_on_chain: !auction.highest_bidder_id
         });
 
         auction.status = nextStatus;

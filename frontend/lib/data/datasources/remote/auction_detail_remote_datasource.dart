@@ -1,6 +1,7 @@
 import '../../../config/constants/api_constants.dart';
 import '../../../core/error/exceptions.dart';
 import '../../../core/network/dio_client.dart';
+import '../../../main.dart';
 import '../../models/auction_detail_model.dart';
 
 abstract class AuctionDetailRemoteDataSource {
@@ -24,12 +25,12 @@ class AuctionDetailRemoteDataSourceImpl
 
       if (response.statusCode == 200) {
         return AuctionDetailModel.fromJson(response.data);
-      } else {
-        throw ServerException(
-          message: 'Failed to fetch auction detail',
-          statusCode: response.statusCode,
-        );
       }
+
+      throw ServerException(
+        message: 'Failed to fetch auction detail',
+        statusCode: response.statusCode,
+      );
     } catch (e) {
       throw ServerException(message: e.toString());
     }
@@ -65,28 +66,27 @@ class AuctionDetailRemoteDataSourceImpl
   @override
   Future<void> confirmReceipt(String auctionId) async {
     try {
-      print('🔵 CONFIRM RECEIPT: Starting for auction $auctionId');
-      print(
-        '🔵 CONFIRM RECEIPT: URL = ${ApiConstants.confirmReceipt}/$auctionId',
-      );
+      final fullUrl = '${ApiConfig.baseUrl}/api${ApiConstants.confirmReceipt}/$auctionId';
+      print('CONFIRM RECEIPT: Starting for auction $auctionId');
+      print('CONFIRM RECEIPT: URL = $fullUrl');
 
       final response = await dioClient.post(
         '${ApiConstants.confirmReceipt}/$auctionId',
       );
 
-      print('🔵 CONFIRM RECEIPT: Response status = ${response.statusCode}');
-      print('🔵 CONFIRM RECEIPT: Response data = ${response.data}');
+      print('CONFIRM RECEIPT: Response status = ${response.statusCode}');
+      print('CONFIRM RECEIPT: Response data = ${response.data}');
 
       if (response.statusCode != 200) {
-        print('❌ CONFIRM RECEIPT: Failed with status ${response.statusCode}');
+        print('CONFIRM RECEIPT: Failed with status ${response.statusCode}');
         throw ServerException(
           message: response.data['error'] ?? 'Failed to confirm receipt',
         );
       }
 
-      print('✅ CONFIRM RECEIPT: Success');
+      print('CONFIRM RECEIPT: Success');
     } catch (e) {
-      print('❌ CONFIRM RECEIPT: Exception = $e');
+      print('CONFIRM RECEIPT: Exception = $e');
       throw ServerException(message: e.toString());
     }
   }

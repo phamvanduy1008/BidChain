@@ -5,10 +5,23 @@ const User = require('../models/User');
 const Auction = require('../models/Auction');
 const Bid = require('../models/Bid');
 const { ethers } = require("ethers");
+const fs = require("fs");
+const path = require("path");
 const { vndToWei, weiToVnd } = require('../utils/conversion');
 const { contract, provider } = require('../blockchain/contract');
 const { signBid } = require('../utils/eip712');
 const { getCurrentAuctionTime } = require('../utils/auctionTime');
+
+function getAuctionAbi() {
+  const abiPath = process.env.CONTRACT_ABI_PATH || './abi/Auction.json';
+  const abiRaw = fs.readFileSync(path.resolve(abiPath), 'utf8');
+  const abiParsed = JSON.parse(abiRaw);
+  return abiParsed.abi || abiParsed;
+}
+
+function getAuctionContractAt(contractAddress, signerOrProvider = provider) {
+  return new ethers.Contract(contractAddress, getAuctionAbi(), signerOrProvider);
+}
 
 const validateBidRequest = [
   body("auction_id").isMongoId().withMessage("auction_id must be a valid ObjectId"),
@@ -73,7 +86,14 @@ const processBid = async (req, res, next) => {
     // Sign bid server-side
     let signature;
     try {
-      signature = await signBid(user, auction_id, amountWei, nonce, timestamp);
+      signature = await signBid(
+        user,
+        auction_id,
+        amountWei,
+        nonce,
+        timestamp,
+        auction.contract_address
+      );
       console.log(`Bid signed successfully`);
     } catch (error) {
       console.error('Bid signing error:', error);
@@ -82,7 +102,11 @@ const processBid = async (req, res, next) => {
 
     // Verify signature on-chain
     try {
-      const isValid = await contract.verifyBidSignature(
+      const verificationContract = auction.contract_address
+        ? getAuctionContractAt(auction.contract_address)
+        : contract;
+
+      const isValid = await verificationContract.verifyBidSignature(
         auction_id,
         ethers.BigNumber.from(amountWei),
         nonce,

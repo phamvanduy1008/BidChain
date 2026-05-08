@@ -3,15 +3,17 @@ const { ethers } = require('ethers');
 const { decrypt } = require('./crypto');
 require('dotenv').config();
 
-/**
- * EIP-712 Domain for BidChain
- */
-const DOMAIN = {
-  name: 'BidChain',
-  version: '1.0',
-  chainId: 1337, // Ganache local
-  verifyingContract: process.env.CONTRACT_ADDRESS
-};
+function buildDomain(verifyingContract) {
+  return {
+    name: 'BidChain',
+    version: '1.0',
+    chainId: 1337,
+    verifyingContract:
+      verifyingContract ||
+      process.env.CONTRACT_ADDRESS ||
+      '0x0000000000000000000000000000000000000000'
+  };
+}
 
 /**
  * Bid type definition for EIP-712
@@ -32,12 +34,14 @@ const BID_TYPES = {
  * @param {string} amountWei - Bid amount in Wei
  * @param {number} nonce - User nonce
  * @param {number} timestamp - Current timestamp
+ * @param {string} [verifyingContract] - Auction contract address used in the EIP-712 domain
  * @returns {Promise<string>} Signature
  */
-async function signBid(user, auctionId, amountWei, nonce, timestamp) {
+async function signBid(user, auctionId, amountWei, nonce, timestamp, verifyingContract) {
   try {
     console.log(`Signing bid - User wallet: ${user.wallet_address}`);
     console.log(`Has encrypted_private_key: ${!!user.encrypted_private_key}`);
+    console.log(`Signing domain contract: ${verifyingContract || process.env.CONTRACT_ADDRESS}`);
 
     // Decrypt private key with MASTER_KEY
     const privateKey = decrypt(user.encrypted_private_key, process.env.MASTER_KEY);
@@ -53,7 +57,7 @@ async function signBid(user, auctionId, amountWei, nonce, timestamp) {
 
     // Sign with EIP-712
     const signature = await wallet._signTypedData(
-      DOMAIN,
+      buildDomain(verifyingContract),
       BID_TYPES,
       bidData
     );
@@ -72,7 +76,7 @@ async function signBid(user, auctionId, amountWei, nonce, timestamp) {
  * @param {Object} params - Verification parameters
  * @returns {Promise<string>} Recovered signer address
  */
-async function verifyBidSignature({ auctionId, amountWei, nonce, timestamp, signature }) {
+async function verifyBidSignature({ auctionId, amountWei, nonce, timestamp, signature, verifyingContract }) {
   try {
     const bidData = {
       auctionId: auctionId,
@@ -82,7 +86,7 @@ async function verifyBidSignature({ auctionId, amountWei, nonce, timestamp, sign
     };
 
     const recoveredAddress = ethers.utils.verifyTypedData(
-      DOMAIN,
+      buildDomain(verifyingContract),
       BID_TYPES,
       bidData,
       signature

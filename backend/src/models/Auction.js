@@ -20,6 +20,8 @@ const AuctionSchema = new mongoose.Schema({
   ended_by_admin: { type: Boolean, default: false },
   ended_by: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
   ended_at: { type: Date },
+  confirmed_by: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+  confirmed_at: { type: Date },
 
   // PHẢI DÙNG STRING WEI - KHÔNG DÙNG Decimal128 NỮA!
   start_price: {
@@ -55,8 +57,8 @@ const AuctionSchema = new mongoose.Schema({
 
   // Blockchain tracking
   blockchain_id: { type: Number }, // On-chain auction ID from smart contract
-  settled_on_chain: { type: Boolean, default: false }, // Whether settlement happened on blockchain
-  settlement_tx: { type: String }, // Settlement transaction hash
+  settled_on_chain: { type: Boolean, default: false }, // Whether BidChainWallet settlement succeeded
+  settlement_tx: { type: String }, // BidChainWallet settlement transaction hash
 
   // Metadata protection (title, images, description)
   original_metadata: {
