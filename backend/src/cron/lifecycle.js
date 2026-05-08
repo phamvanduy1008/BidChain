@@ -2,6 +2,7 @@ const fs = require("fs");
 const path = require("path");
 const ethers = require("ethers");
 const Auction = require("../models/Auction");
+const Bid = require("../models/Bid");
 const Notification = require("../models/Notification");
 const { AUCTION_STATUS } = require("../config/constants");
 const { weiToVnd, formatVnd } = require("../utils/conversion");
@@ -110,13 +111,49 @@ async function transitionEndedAuctions(io, chainNow) {
         auction.status = nextStatus;
 
         if (auction.highest_bidder_id) {
-            await Notification.create({
+            const winnerNotification = await Notification.create({
                 user_id: auction.highest_bidder_id._id,
                 type: "WON_AUCTION",
                 title: "Ban da la nguoi chien thang",
                 message: `Ban tam thoi la nguoi chien thang trong phien dau gia "${auction.title}".`,
                 related_id: auction._id
             });
+
+            if (io) {
+                io.to(`user_${auction.highest_bidder_id._id}`).emit("notification", {
+                    ...winnerNotification.toObject(),
+                    _id: winnerNotification._id.toString()
+                });
+            }
+
+            const participantIds = await Bid.distinct("user_id", {
+                auction_id: auction._id
+            });
+            const winnerId = auction.highest_bidder_id._id.toString();
+            const loserIds = participantIds
+                .map((id) => id.toString())
+                .filter((userId) => userId !== winnerId);
+
+            if (loserIds.length > 0) {
+                const loserNotifications = await Notification.insertMany(
+                    loserIds.map((userId) => ({
+                        user_id: userId,
+                        type: "AUCTION_LOST",
+                        title: "Phien dau gia da ket thuc",
+                        message: `Phien dau gia "${auction.title}" da ket thuc. Ban khong phai la nguoi chien thang.`,
+                        related_id: auction._id
+                    }))
+                );
+
+                if (io) {
+                    for (const notification of loserNotifications) {
+                        io.to(`user_${notification.user_id.toString()}`).emit("notification", {
+                            ...notification.toObject(),
+                            _id: notification._id.toString()
+                        });
+                    }
+                }
+            }
         }
 
         emitAuctionState(io, auction, "auction_ended", {

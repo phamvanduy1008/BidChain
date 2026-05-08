@@ -79,16 +79,6 @@ class _AuctionDetailPageState extends State<AuctionDetailPage> {
 
     if (eventName == 'user_outbid') {
       _showOutbidDialog();
-      return;
-    }
-
-    if (eventName == 'auction_ended') {
-      final authState = context.read<AuthBloc>().state;
-      if (authState is AuthSuccessState) {
-        final winnerId = event['winner_id']?.toString();
-        final isWinner = winnerId != null && winnerId == authState.user.id;
-        _showAuctionEndedDialog(isWinner: isWinner);
-      }
     }
   }
 
@@ -119,27 +109,6 @@ class _AuctionDetailPageState extends State<AuctionDetailPage> {
       ),
     );
   }
-
-  void _showAuctionEndedDialog({required bool isWinner}) {
-    final message = isWinner
-        ? 'Bạn đã là người chiến thắng'
-        : 'Phiên đấu giá đã kết thúc. Bạn không phải là người chiến thắng.';
-
-    showDialog(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: Text(isWinner ? 'Kết quả đấu giá' : 'Phiên đấu giá kết thúc'),
-        content: Text(message),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext),
-            child: const Text('Đóng'),
-          ),
-        ],
-      ),
-    );
-  }
-
   void _handleCountdownExpired() {
     _countdownExpiryRefreshTimer?.cancel();
     _statusTransitionPollTimer?.cancel();
@@ -884,3 +853,4 @@ class _PriceItem extends StatelessWidget {
     );
   }
 }
+

@@ -7,6 +7,7 @@ class ApiConstants {
 
   // Auction endpoints
   static const String getAuctions = '/auction/all';
+  static const String getActiveAuctions = '/auction/active';
   static const String getAuctionDetail = '/auction';
   static const String createAuction = '/auction/create';
   static const String placeBid = '/auction/bid';

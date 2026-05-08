@@ -1,9 +1,12 @@
+import 'dart:async';
+import 'dart:math';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:frontend/core/services/notification_popup_service.dart';
 import 'package:frontend/core/services/server_time_service.dart';
 import 'package:frontend/core/services/socket_service.dart';
 import 'package:go_router/go_router.dart';
+
 import '../../../config/routes/app_routes.dart';
 import '../../../config/theme/app_colors.dart';
 import '../../../config/theme/app_text_styles.dart';
@@ -16,10 +19,7 @@ import '../../bloc/category/category_bloc.dart';
 import '../../bloc/category/category_event.dart';
 import '../../bloc/category/category_state.dart';
 import '../../bloc/notification/notification_bloc.dart';
-import 'dart:async';
-
 import '../../widgets/auction/auction_card.dart';
-
 import '../../widgets/common/category_chip.dart';
 import '../../widgets/common/section_header.dart';
 
@@ -32,14 +32,13 @@ class HomePage extends StatefulWidget {
 
 class _HomePageState extends State<HomePage>
     with AutomaticKeepAliveClientMixin, WidgetsBindingObserver {
-  String? _selectedCategoryId;
-  String _searchQuery = '';
+  final Random _random = Random();
   final TextEditingController _searchController = TextEditingController();
 
-  // Smart refresh mechanism
+  String? _selectedCategoryId;
+  String _searchQuery = '';
   DateTime? _lastRefreshTime;
   static const _refreshThreshold = Duration(minutes: 5);
-  StreamSubscription? _notificationSubscription;
   StreamSubscription<Map<String, dynamic>>? _auctionEventSubscription;
 
   @override
@@ -58,19 +57,6 @@ class _HomePageState extends State<HomePage>
     });
 
     final socketService = SocketService();
-    _notificationSubscription = socketService.notificationStream.listen((data) {
-      if (mounted) {
-        NotificationPopupService.show(
-          context: context,
-          title: data['title'] ?? 'Thông báo mới',
-          message: data['message'] ?? '',
-          onTap: () {
-            // Navigate to notifications page
-            Navigator.pushNamed(context, '/notifications');
-          },
-        );
-      }
-    });
     _auctionEventSubscription = socketService.auctionEventStream.listen((_) {
       if (mounted) {
         context.read<AuctionBloc>().add(RefreshAuctions());
@@ -82,12 +68,10 @@ class _HomePageState extends State<HomePage>
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _searchController.dispose();
-    _notificationSubscription?.cancel();
     _auctionEventSubscription?.cancel();
     super.dispose();
   }
 
-  /// Monitor app lifecycle to refresh data when needed
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
@@ -95,12 +79,10 @@ class _HomePageState extends State<HomePage>
     }
   }
 
-  /// Smart refresh: only refresh if more than 5 minutes have passed
   void _refreshIfNeeded() {
     final now = DateTime.now();
     if (_lastRefreshTime == null ||
         now.difference(_lastRefreshTime!) > _refreshThreshold) {
-      // Refresh data silently in background
       context.read<AuctionBloc>().add(RefreshAuctions());
       context.read<CategoryBloc>().add(GetCategories());
       _lastRefreshTime = now;
@@ -109,7 +91,8 @@ class _HomePageState extends State<HomePage>
 
   @override
   Widget build(BuildContext context) {
-    super.build(context); // Required for AutomaticKeepAliveClientMixin
+    super.build(context);
+
     return Scaffold(
       backgroundColor: AppColors.white,
       appBar: _buildAppBar(),
@@ -117,21 +100,18 @@ class _HomePageState extends State<HomePage>
         onRefresh: () async {
           context.read<AuctionBloc>().add(RefreshAuctions());
           context.read<CategoryBloc>().add(GetCategories());
-          _lastRefreshTime = DateTime.now(); // Update refresh time
+          _lastRefreshTime = DateTime.now();
         },
         color: AppColors.black,
         child: CustomScrollView(
           physics: const AlwaysScrollableScrollPhysics(),
           slivers: [
-            // Search Bar Section
             SliverToBoxAdapter(
               child: Padding(
                 padding: const EdgeInsets.all(20),
                 child: _buildSearchBar(),
               ),
             ),
-
-            // Category Section
             SliverToBoxAdapter(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -152,108 +132,27 @@ class _HomePageState extends State<HomePage>
                 ],
               ),
             ),
-
-            // Popular Auctions Section
             BlocBuilder<AuctionBloc, AuctionState>(
               builder: (context, state) {
-                if (state is AuctionLoaded && state.auctions.isNotEmpty) {
-                  // Filter auctions by selected category and search query
-                  var filteredAuctions = state.auctions;
+                final filteredAuctions = state is AuctionLoaded
+                    ? _filterAuctions(state.auctions)
+                    : <dynamic>[];
+                final randomAuctions = _pickRandomAuctions(filteredAuctions, 4);
 
-                  // Filter by category
-                  if (_selectedCategoryId != null) {
-                    filteredAuctions = filteredAuctions
-                        .where(
-                          (auction) =>
-                              auction.categoryId == _selectedCategoryId,
-                        )
-                        .toList();
-                  }
-
-                  // Filter by search query
-                  if (_searchQuery.isNotEmpty) {
-                    filteredAuctions = filteredAuctions.where((auction) {
-                      final titleLower = auction.title.toLowerCase();
-                      final descLower = auction.description.toLowerCase();
-                      return titleLower.contains(_searchQuery) ||
-                          descLower.contains(_searchQuery);
-                    }).toList();
-                  }
-
-                  final popularAuctions = [...filteredAuctions]
-                    ..sort((a, b) => b.bidCount.compareTo(a.bidCount));
-                  final topAuctions = popularAuctions.take(10).toList();
-
-                  if (topAuctions.isEmpty) {
-                    return const SliverToBoxAdapter(child: SizedBox.shrink());
-                  }
-
-                  return SliverToBoxAdapter(
-                    child: Column(
-                      children: [
-                        Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 20),
-                          child: SectionHeader(
-                            title: 'Đấu giá nổi bật',
-                            onSeeAllTap: () =>
-                                context.go(AppRoutes.auctionList),
-                          ),
-                        ),
-                        const SizedBox(height: 16),
-                        SizedBox(
-                          height: 310,
-                          child: ListView.builder(
-                            scrollDirection: Axis.horizontal,
-                            padding: const EdgeInsets.symmetric(horizontal: 20),
-                            itemCount: topAuctions.length,
-                            itemBuilder: (context, index) {
-                              final auction = topAuctions[index];
-                              return Container(
-                                width: 180,
-                                margin: EdgeInsets.only(
-                                  right: index < topAuctions.length - 1
-                                      ? 12
-                                      : 0,
-                                ),
-                                child: AuctionCard(
-                                  auctionId: auction.auctionId,
-                                  title: auction.title,
-                                  imageUrl: auction.images.isNotEmpty
-                                      ? auction.images.first
-                                      : null,
-                                  currentBid: auction.formattedCurrentPrice,
-                                  timeLeft: _calculateTimeLeft(
-                                    auction.startTime,
-                                    auction.endTime,
-                                    auction.status,
-                                  ),
-                                  status: resolveAuctionStatus(
-                                    status: auction.status,
-                                    startTime: auction.startTime,
-                                    endTime: auction.endTime,
-                                  ),
-                                  bidCount: auction.bidCount,
-                                  sellerName: auction.sellerName,
-                                  onTap: () {
-                                    context.go(
-                                      '${AppRoutes.auctionDetail}/${auction.auctionId}',
-                                    );
-                                  },
-                                ),
-                              );
-                            },
-                          ),
-                        ),
-                        const SizedBox(height: 32),
-                      ],
-                    ),
-                  );
-                }
-                return const SliverToBoxAdapter(child: SizedBox.shrink());
+                return SliverToBoxAdapter(
+                  child: _buildHorizontalAuctionSection(
+                    title: 'Các phiên đấu giá',
+                    auctions: randomAuctions,
+                    state: state,
+                    emptyMessage: _searchQuery.isNotEmpty
+                        ? 'Chưa có phiên đấu giá phù hợp với từ khóa tìm kiếm'
+                        : _selectedCategoryId != null
+                        ? 'Chưa có phiên đấu giá trong danh mục này'
+                        : 'Hiện chưa có phiên đấu giá nào',
+                  ),
+                );
               },
             ),
-
-            // Active Auctions Section
             SliverToBoxAdapter(
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -263,17 +162,18 @@ class _HomePageState extends State<HomePage>
                 ),
               ),
             ),
-
             const SliverToBoxAdapter(child: SizedBox(height: 16)),
-
-            // Auction Grid
             BlocBuilder<AuctionBloc, AuctionState>(
               builder: (context, state) {
                 if (state is AuctionLoading) {
                   return const SliverFillRemaining(
-                    child: Center(child: CircularProgressIndicator()),
+                    child: Center(
+                      child: CircularProgressIndicator(color: AppColors.black),
+                    ),
                   );
-                } else if (state is AuctionError) {
+                }
+
+                if (state is AuctionError) {
                   return SliverFillRemaining(
                     child: Center(
                       child: Column(
@@ -289,9 +189,7 @@ class _HomePageState extends State<HomePage>
                           const SizedBox(height: 16),
                           ElevatedButton(
                             onPressed: () {
-                              context.read<AuctionBloc>().add(
-                                RefreshAuctions(),
-                              );
+                              context.read<AuctionBloc>().add(RefreshAuctions());
                             },
                             child: const Text('Thử lại'),
                           ),
@@ -299,29 +197,10 @@ class _HomePageState extends State<HomePage>
                       ),
                     ),
                   );
-                } else if (state is AuctionLoaded) {
-                  // Filter auctions by selected category and search query
-                  var filteredAuctions = state.auctions;
+                }
 
-                  // Filter by category
-                  if (_selectedCategoryId != null) {
-                    filteredAuctions = filteredAuctions
-                        .where(
-                          (auction) =>
-                              auction.categoryId == _selectedCategoryId,
-                        )
-                        .toList();
-                  }
-
-                  // Filter by search query
-                  if (_searchQuery.isNotEmpty) {
-                    filteredAuctions = filteredAuctions.where((auction) {
-                      final titleLower = auction.title.toLowerCase();
-                      final descLower = auction.description.toLowerCase();
-                      return titleLower.contains(_searchQuery) ||
-                          descLower.contains(_searchQuery);
-                    }).toList();
-                  }
+                if (state is AuctionLoaded) {
+                  final filteredAuctions = _filterAuctions(state.activeAuctions);
 
                   if (filteredAuctions.isEmpty) {
                     return SliverFillRemaining(
@@ -336,9 +215,12 @@ class _HomePageState extends State<HomePage>
                             ),
                             const SizedBox(height: 16),
                             Text(
-                              _selectedCategoryId != null
+                              _searchQuery.isNotEmpty
+                                  ? 'Không tìm thấy phiên đấu giá cho "$_searchQuery"'
+                                  : _selectedCategoryId != null
                                   ? 'Không có phiên đấu giá nào trong danh mục này'
                                   : 'Hiện chưa có phiên đấu giá đang diễn ra',
+                              textAlign: TextAlign.center,
                               style: AppTextStyles.bodyMedium.copyWith(
                                 color: AppColors.grey,
                               ),
@@ -347,57 +229,29 @@ class _HomePageState extends State<HomePage>
                         ),
                       ),
                     );
-                  } else {
-                    return SliverPadding(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 20,
-                        vertical: 0,
-                      ),
-                      sliver: SliverGrid(
-                        gridDelegate:
-                            const SliverGridDelegateWithFixedCrossAxisCount(
-                              crossAxisCount: 2,
-                              childAspectRatio: 0.57,
-                              crossAxisSpacing: 16,
-                              mainAxisSpacing: 16,
-                            ),
-                        delegate: SliverChildBuilderDelegate((context, index) {
-                          final auction = filteredAuctions[index];
-                          return AuctionCard(
-                            auctionId: auction.auctionId,
-                            title: auction.title,
-                            imageUrl: auction.images.isNotEmpty
-                                ? auction.images.first
-                                : null,
-                            currentBid: auction.formattedCurrentPrice,
-                            timeLeft: _calculateTimeLeft(
-                              auction.startTime,
-                              auction.endTime,
-                              auction.status,
-                            ),
-                            status: resolveAuctionStatus(
-                              status: auction.status,
-                              startTime: auction.startTime,
-                              endTime: auction.endTime,
-                            ),
-                            bidCount: auction.bidCount,
-                            sellerName: auction.sellerName,
-                            onTap: () {
-                              context.go(
-                                '${AppRoutes.auctionDetail}/${auction.auctionId}',
-                              );
-                            },
-                          );
-                        }, childCount: filteredAuctions.length),
-                      ),
-                    );
                   }
+
+                  return SliverPadding(
+                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    sliver: SliverGrid(
+                      gridDelegate:
+                          const SliverGridDelegateWithFixedCrossAxisCount(
+                            crossAxisCount: 2,
+                            childAspectRatio: 0.57,
+                            crossAxisSpacing: 16,
+                            mainAxisSpacing: 16,
+                          ),
+                      delegate: SliverChildBuilderDelegate((context, index) {
+                        final auction = filteredAuctions[index];
+                        return _buildAuctionCard(auction);
+                      }, childCount: filteredAuctions.length),
+                    ),
+                  );
                 }
+
                 return const SliverToBoxAdapter(child: SizedBox.shrink());
               },
             ),
-
-            // Bottom Padding
             const SliverToBoxAdapter(child: SizedBox(height: 120)),
           ],
         ),
@@ -419,7 +273,6 @@ class _HomePageState extends State<HomePage>
       centerTitle: true,
       automaticallyImplyLeading: false,
       actions: [
-        // Notification Icon with Badge
         BlocBuilder<NotificationBloc, NotificationState>(
           builder: (context, state) {
             return IconButton(
@@ -458,9 +311,7 @@ class _HomePageState extends State<HomePage>
           suffixIcon: _searchQuery.isNotEmpty
               ? IconButton(
                   icon: const Icon(Icons.clear, color: AppColors.grey),
-                  onPressed: () {
-                    _searchController.clear();
-                  },
+                  onPressed: _searchController.clear,
                 )
               : null,
           border: InputBorder.none,
@@ -477,7 +328,6 @@ class _HomePageState extends State<HomePage>
     return BlocBuilder<CategoryBloc, CategoryState>(
       builder: (context, state) {
         if (state is CategoryLoaded) {
-          // Add "All" category at the beginning
           final allCategories = [
             {'id': null, 'name': 'Tất cả', 'icon': Icons.apps},
             ...state.categories.map(
@@ -517,35 +367,154 @@ class _HomePageState extends State<HomePage>
               },
             ),
           );
-        } else if (state is CategoryLoading) {
+        }
+
+        if (state is CategoryLoading) {
           return const SizedBox(
             height: 50,
             child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
           );
-        } else {
-          // Show default categories if loading fails
-          return SizedBox(
-            height: 50,
-            child: ListView(
-              scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              children: [
-                CategoryChip(
-                  label: 'Tất cả',
-                  icon: Icons.apps,
-                  isSelected: _selectedCategoryId == null,
-                  onTap: () {
-                    setState(() {
-                      _selectedCategoryId = null;
-                    });
-                  },
-                ),
-              ],
-            ),
-          );
         }
+
+        return SizedBox(
+          height: 50,
+          child: ListView(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            children: [
+              CategoryChip(
+                label: 'Tất cả',
+                icon: Icons.apps,
+                isSelected: _selectedCategoryId == null,
+                onTap: () {
+                  setState(() {
+                    _selectedCategoryId = null;
+                  });
+                },
+              ),
+            ],
+          ),
+        );
       },
     );
+  }
+
+  Widget _buildHorizontalAuctionSection({
+    required String title,
+    required List<dynamic> auctions,
+    required AuctionState state,
+    required String emptyMessage,
+  }) {
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20),
+          child: SectionHeader(
+            title: title,
+            onSeeAllTap: () => context.go(AppRoutes.auctionList),
+          ),
+        ),
+        const SizedBox(height: 16),
+        if (state is AuctionLoading)
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 32),
+            child: CircularProgressIndicator(color: AppColors.black),
+          )
+        else if (auctions.isEmpty)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
+            child: _buildSectionEmptyState(emptyMessage),
+          )
+        else
+          SizedBox(
+            height: 310,
+            child: ListView.builder(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              itemCount: auctions.length,
+              itemBuilder: (context, index) {
+                final auction = auctions[index];
+                return Container(
+                  width: 180,
+                  margin: EdgeInsets.only(
+                    right: index < auctions.length - 1 ? 12 : 0,
+                  ),
+                  child: _buildAuctionCard(auction),
+                );
+              },
+            ),
+          ),
+        const SizedBox(height: 32),
+      ],
+    );
+  }
+
+  Widget _buildSectionEmptyState(String message) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 22),
+      decoration: BoxDecoration(
+        color: AppColors.greyLight,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.tertiary),
+      ),
+      child: Column(
+        children: [
+          Icon(Icons.inbox_outlined, color: AppColors.grey, size: 32),
+          const SizedBox(height: 10),
+          Text(
+            message,
+            textAlign: TextAlign.center,
+            style: AppTextStyles.bodyMedium.copyWith(color: AppColors.grey),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAuctionCard(dynamic auction) {
+    return AuctionCard(
+      auctionId: auction.auctionId,
+      title: auction.title,
+      imageUrl: auction.images.isNotEmpty ? auction.images.first : null,
+      currentBid: auction.formattedCurrentPrice,
+      timeLeft: _calculateTimeLeft(
+        auction.startTime,
+        auction.endTime,
+        auction.status,
+      ),
+      status: resolveAuctionStatus(
+        status: auction.status,
+        startTime: auction.startTime,
+        endTime: auction.endTime,
+      ),
+      bidCount: auction.bidCount,
+      sellerName: auction.sellerName,
+      onTap: () {
+        context.go('${AppRoutes.auctionDetail}/${auction.auctionId}');
+      },
+    );
+  }
+
+  List<dynamic> _filterAuctions(List<dynamic> auctions) {
+    var filteredAuctions = List.of(auctions);
+
+    if (_selectedCategoryId != null) {
+      filteredAuctions = filteredAuctions
+          .where((auction) => auction.categoryId == _selectedCategoryId)
+          .toList();
+    }
+
+    if (_searchQuery.isNotEmpty) {
+      filteredAuctions = filteredAuctions.where((auction) {
+        final titleLower = auction.title.toLowerCase();
+        final descLower = auction.description.toLowerCase();
+        return titleLower.contains(_searchQuery) ||
+            descLower.contains(_searchQuery);
+      }).toList();
+    }
+
+    return filteredAuctions;
   }
 
   IconData _getCategoryIcon(String categoryName) {
@@ -577,11 +546,9 @@ class _HomePageState extends State<HomePage>
       return Icons.handyman;
     } else if (name.contains('sách') || name.contains('book')) {
       return Icons.book;
-    } else if (name.contains('khác')) {
-      return Icons.category;
     }
 
-    return Icons.category; // default
+    return Icons.category;
   }
 
   String _calculateTimeLeft(
@@ -596,11 +563,18 @@ class _HomePageState extends State<HomePage>
       endTime: endTime,
       now: now,
     );
+
     if (effectiveStatus == 'APPROVED' &&
         startTime != null &&
         now.isBefore(startTime)) {
       return 'Bắt đầu ${AppLocalizations.formatTimeLeft(startTime)}';
     }
+
     return AppLocalizations.formatTimeLeft(endTime);
+  }
+
+  List<dynamic> _pickRandomAuctions(List<dynamic> auctions, int count) {
+    final shuffled = List.of(auctions)..shuffle(_random);
+    return shuffled.take(count).toList();
   }
 }

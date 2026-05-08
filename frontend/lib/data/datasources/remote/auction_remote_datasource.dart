@@ -9,6 +9,7 @@ import '../../models/create_auction_request.dart';
 
 abstract class AuctionRemoteDataSource {
   Future<List<AuctionModel>> getAuctions();
+  Future<List<AuctionModel>> getActiveAuctions();
   Future<AuctionModel> getAuctionDetail(String auctionId);
   Future<String> createAuction(CreateAuctionRequest request);
   Future<List<String>> uploadImages(List<File> images);
@@ -56,6 +57,44 @@ class AuctionRemoteDataSourceImpl implements AuctionRemoteDataSource {
       } else {
         throw ServerException(
           message: 'Failed to fetch auctions',
+          statusCode: response.statusCode,
+        );
+      }
+    } catch (e) {
+      throw ServerException(message: e.toString());
+    }
+  }
+
+  @override
+  Future<List<AuctionModel>> getActiveAuctions() async {
+    try {
+      final response = await dioClient.get(ApiConstants.getActiveAuctions);
+
+      if (response.statusCode == 200) {
+        if (response.data is List) {
+          final list = response.data as List;
+          final auctions = <AuctionModel>[];
+          for (var i = 0; i < list.length; i++) {
+            try {
+              final auction = AuctionModel.fromJson(list[i]);
+              auctions.add(auction);
+            } catch (_) {
+              // Skip invalid auctions
+            }
+          }
+          return auctions;
+        } else if (response.data is Map && response.data['data'] is List) {
+          final list = response.data['data'] as List;
+          return list.map((e) => AuctionModel.fromJson(e)).toList();
+        } else {
+          throw ServerException(
+            message:
+                'Invalid response format: Expected List but got ${response.data.runtimeType}',
+          );
+        }
+      } else {
+        throw ServerException(
+          message: 'Failed to fetch active auctions',
           statusCode: response.statusCode,
         );
       }
