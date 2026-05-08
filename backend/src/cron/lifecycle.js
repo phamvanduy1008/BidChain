@@ -61,11 +61,15 @@ async function transitionEndedAuctions(io, chainNow) {
     }).populate("seller_id highest_bidder_id");
 
     for (const auction of auctionsToEnd) {
+        const nextStatus = auction.highest_bidder_id
+            ? AUCTION_STATUS.WAITING_CONFIRMATION
+            : AUCTION_STATUS.ENDED;
+
         await Auction.findByIdAndUpdate(auction._id, {
-            status: AUCTION_STATUS.ENDED
+            status: nextStatus
         });
 
-        auction.status = AUCTION_STATUS.ENDED;
+        auction.status = nextStatus;
 
         if (auction.highest_bidder_id) {
             await Notification.create({
@@ -80,7 +84,7 @@ async function transitionEndedAuctions(io, chainNow) {
         emitAuctionState(io, auction, "auction_ended", {
             winner_id: auction.highest_bidder_id?._id?.toString() || null
         });
-        console.log(`Auction ${auction._id} ended`);
+        console.log(`Auction ${auction._id} ended with status ${nextStatus}`);
     }
 }
 

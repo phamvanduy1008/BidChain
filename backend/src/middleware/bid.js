@@ -8,6 +8,7 @@ const { ethers } = require("ethers");
 const { vndToWei, weiToVnd } = require('../utils/conversion');
 const { contract, provider } = require('../blockchain/contract');
 const { signBid } = require('../utils/eip712');
+const { getCurrentAuctionTime } = require('../utils/auctionTime');
 
 const validateBidRequest = [
   body("auction_id").isMongoId().withMessage("auction_id must be a valid ObjectId"),
@@ -46,13 +47,12 @@ const processBid = async (req, res, next) => {
       console.error(`Bid failed: Auction ${auction_id} status is ${auction.status}`);
       return res.status(400).json({ error: 'Auction is not active' });
     }
-    const latestBlock = await provider.getBlock("latest");
-    const chainNow = new Date(latestBlock.timestamp * 1000);
-    if (auction.start_time && chainNow < auction.start_time) {
+    const currentNow = getCurrentAuctionTime();
+    if (auction.start_time && currentNow < auction.start_time) {
       console.error(`Bid failed: Auction ${auction_id} has not started yet`);
       return res.status(400).json({ error: 'Auction has not started yet' });
     }
-    if (chainNow > auction.end_time) {
+    if (currentNow > auction.end_time) {
       console.error(`Bid failed: Auction ${auction_id} has ended`);
       return res.status(400).json({ error: 'Auction has ended' });
     }

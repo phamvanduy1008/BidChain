@@ -89,6 +89,20 @@ class StatusBadge extends StatelessWidget {
           borderColor: const Color(0xFFFF8F00),
           textColor: Colors.white,
         );
+      case 'LOST':
+        return _StatusConfig(
+          label: 'Báº¡n Ä‘Ã£ thua',
+          backgroundColor: const Color(0xFF8D6E63).withOpacity(0.95),
+          borderColor: const Color(0xFF6D4C41),
+          textColor: Colors.white,
+        );
+      case 'LOST_VIEW':
+        return _StatusConfig(
+          label: 'Ban da thua',
+          backgroundColor: const Color(0xFF8D6E63).withOpacity(0.95),
+          borderColor: const Color(0xFF6D4C41),
+          textColor: Colors.white,
+        );
       default:
         return _StatusConfig(
           label: AppLocalizations.translateStatus(status),

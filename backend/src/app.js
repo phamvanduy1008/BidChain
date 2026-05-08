@@ -43,8 +43,8 @@ app.set("io", io);
 global.io = io;
 
 const { runSettlementCron } = require("./cron/settlement");
-setInterval(runSettlementCron, 20000);
-console.log("Settlement cron job started (runs every 20s)");
+setInterval(runSettlementCron, 5000);
+console.log("Settlement cron job started (runs every 5s)");
 
 const { runAuctionLifecycleCron } = require("./cron/lifecycle");
 setInterval(runAuctionLifecycleCron, 1000);

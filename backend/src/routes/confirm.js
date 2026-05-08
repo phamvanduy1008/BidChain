@@ -1,14 +1,80 @@
 const express = require('express');
+const fs = require('fs');
+const path = require('path');
 const router = express.Router();
 const { authMiddleware } = require('../middleware/auth');
 const Auction = require('../models/Auction');
 const User = require('../models/User');
 const Notification = require('../models/Notification');
-const { contract, walletFromPrivateKey } = require('../blockchain/contract');
+const { provider, walletFromPrivateKey } = require('../blockchain/contract');
 const { AUCTION_STATUS } = require('../config/constants');
 const { formatVnd } = require('../utils/conversion');
 const { ethers } = require('ethers');
 const { decrypt } = require('../utils/crypto');
+
+function isNonBlockingAuctionConfirmError(error) {
+    const message = error?.message || '';
+    return /Insufficient contract balance|Transfer to seller failed|Auction not settled|Auction not ended|cannot estimate gas|UNPREDICTABLE_GAS_LIMIT/i.test(message);
+}
+
+function getAuctionAbi() {
+    const abiPath = process.env.CONTRACT_ABI_PATH || './abi/Auction.json';
+    const abiRaw = fs.readFileSync(path.resolve(abiPath), 'utf8');
+    const abiParsed = JSON.parse(abiRaw);
+    return abiParsed.abi || abiParsed;
+}
+
+function getAuctionContractAt(contractAddress, signerOrProvider = provider) {
+    return new ethers.Contract(contractAddress, getAuctionAbi(), signerOrProvider);
+}
+
+async function ensureAuctionReadyForConfirmation(auction, winningBid) {
+    if (!auction.blockchain_id || !auction.contract_address) {
+        return;
+    }
+
+    const deployerWallet = walletFromPrivateKey(process.env.DEPLOYER_PRIVATE_KEY);
+    const deployerAuctionContract = getAuctionContractAt(
+        auction.contract_address,
+        deployerWallet
+    );
+
+    let onChainAuction = await deployerAuctionContract.getAuction(auction.blockchain_id);
+
+    if (!onChainAuction.ended) {
+        console.log(`Auction ${auction._id} is not ended on-chain. Ending before confirmation...`);
+        const endTx = await deployerAuctionContract.endAuction(auction.blockchain_id);
+        console.log(`endAuction transaction sent: ${endTx.hash}`);
+        const endReceipt = await endTx.wait();
+        if (endReceipt.status !== 1) {
+            throw new Error('endAuction transaction reverted');
+        }
+
+        onChainAuction = await deployerAuctionContract.getAuction(auction.blockchain_id);
+        if (!onChainAuction.ended) {
+            throw new Error('Auction is still not ended on-chain after endAuction');
+        }
+    }
+
+    if (!onChainAuction.settled) {
+        console.log(`Auction ${auction._id} is not settled on-chain. Settling before confirmation...`);
+        const settleTx = await deployerAuctionContract.settleAuction(
+            auction.blockchain_id,
+            winningBid.user_id.wallet_address,
+            winningBid.amount_wei
+        );
+        console.log(`settleAuction transaction sent: ${settleTx.hash}`);
+        const settleReceipt = await settleTx.wait();
+        if (settleReceipt.status !== 1) {
+            throw new Error('settleAuction transaction reverted');
+        }
+
+        onChainAuction = await deployerAuctionContract.getAuction(auction.blockchain_id);
+        if (!onChainAuction.settled) {
+            throw new Error('Auction is still not settled on-chain after settleAuction');
+        }
+    }
+}
 
 // POST /api/confirm/:id
 router.post('/:id', authMiddleware, async (req, res) => {
@@ -28,7 +94,7 @@ router.post('/:id', authMiddleware, async (req, res) => {
         }
 
         // Check if user is the winner
-        if (auction.highest_bidder_id.toString() !== userId) {
+        if (!auction.highest_bidder_id || auction.highest_bidder_id.toString() !== userId) {
             return res.status(403).json({ error: 'Only the winner can confirm receipt' });
         }
 
@@ -37,8 +103,26 @@ router.post('/:id', authMiddleware, async (req, res) => {
             return res.status(400).json({ error: 'Auction is not waiting for confirmation' });
         }
 
+        const winningBid = await require('../models/Bid').findOne({
+            auction_id: auction._id,
+            status: 'WINNING'
+        }).populate('user_id');
+
+        if (!winningBid) {
+            return res.status(400).json({ error: 'Winning bid not found' });
+        }
+
+        // Best-effort mirror sync for Auction.sol.
+        if (auction.blockchain_id && auction.contract_address) {
+            try {
+                await ensureAuctionReadyForConfirmation(auction, winningBid);
+            } catch (error) {
+                console.warn('Blockchain settlement preparation skipped:', error.message);
+            }
+        }
+
         // Blockchain confirmation must succeed before any DB mirror update.
-        if (auction.blockchain_id) {
+        if (auction.blockchain_id && auction.contract_address) {
             try {
                 console.log(`Attempting blockchain confirmation for ID ${auction.blockchain_id}`);
 
@@ -50,8 +134,9 @@ router.post('/:id', authMiddleware, async (req, res) => {
                 console.log('DEBUG: Decrypting key...');
                 const privateKey = decrypt(userWithKey.encrypted_private_key, process.env.MASTER_KEY);
                 const userWallet = walletFromPrivateKey(privateKey);
+                const auctionContract = getAuctionContractAt(auction.contract_address, userWallet);
 
-                const tx = await contract.connect(userWallet).confirmReceived(auction.blockchain_id);
+                const tx = await auctionContract.confirmReceived(auction.blockchain_id);
                 console.log(`Confirm transaction sent: ${tx.hash}`);
                 const receipt = await tx.wait();
                 if (receipt.status !== 1) {
@@ -59,21 +144,23 @@ router.post('/:id', authMiddleware, async (req, res) => {
                 }
                 console.log(`Confirm confirmed in block ${receipt.blockNumber}`);
             } catch (error) {
-                console.error('Blockchain confirmation failed:', error.message);
-                return res.status(502).json({
-                    error: 'Blockchain confirmation failed',
-                    details: error.message
-                });
+                if (isNonBlockingAuctionConfirmError(error)) {
+                    console.warn(
+                        'Auction contract confirmation skipped because funds are managed by BidChainWallet:',
+                        error.message
+                    );
+                } else {
+                    console.error('Blockchain confirmation failed:', error.message);
+                    return res.status(502).json({
+                        error: 'Blockchain confirmation failed',
+                        details: error.message
+                    });
+                }
             }
         }
 
         // Update Seller Balance - Now using ON-CHAIN settlement
         // The BidChainWallet contract transfers from winner's locked balance to seller
-        const winningBid = await require('../models/Bid').findOne({
-            auction_id: auction._id,
-            status: 'WINNING'
-        });
-
         if (winningBid) {
             const bidAmountWei = winningBid.amount_wei.toString();
             const winner = await User.findById(auction.highest_bidder_id);
@@ -128,6 +215,22 @@ router.post('/:id', authMiddleware, async (req, res) => {
             console.log(`Auction status updated to: ${updatedAuction.status}`);
         }
 
+        const io = global.io;
+        if (io) {
+            const payload = {
+                auction_id: auction._id.toString(),
+                status: AUCTION_STATUS.SETTLED,
+                start_time: auction.start_time,
+                end_time: auction.end_time,
+                winner_id: auction.highest_bidder_id.toString(),
+                highest_bidder_id: auction.highest_bidder_id.toString(),
+                server_time: new Date().toISOString()
+            };
+
+            io.to(`auction_${auction._id}`).emit('auction_state_changed', payload);
+            io.to(`auction_${auction._id}`).emit('auction_settled', payload);
+        }
+
         // Notify Seller
         await Notification.create({
             user_id: auction.seller_id._id,
@@ -146,7 +249,11 @@ router.post('/:id', authMiddleware, async (req, res) => {
             related_id: auction._id
         });
 
-        res.json({ success: true, message: 'Receipt confirmed and funds released' });
+        res.json({
+            success: true,
+            message: 'Receipt confirmed and funds released',
+            status: AUCTION_STATUS.SETTLED
+        });
 
     } catch (error) {
         console.error('Confirmation error:', error);

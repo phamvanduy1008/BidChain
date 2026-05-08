@@ -177,7 +177,8 @@ class _AuctionDetailPageState extends State<AuctionDetailPage> {
 
       final state = context.read<AuctionDetailBloc>().state;
       if (state is AuctionDetailLoaded &&
-          state.auction.status != expectedOldStatus) {
+          state.auction.status != expectedOldStatus &&
+          !_shouldContinueStatusPolling(state.auction)) {
         timer.cancel();
         return;
       }
@@ -187,7 +188,7 @@ class _AuctionDetailPageState extends State<AuctionDetailPage> {
         RefreshAuctionDetail(auctionId: widget.auctionId),
       );
 
-      if (attempts >= 8) {
+      if (attempts >= 30) {
         timer.cancel();
       }
     });
@@ -353,6 +354,37 @@ class _AuctionDetailPageState extends State<AuctionDetailPage> {
     );
   }
 
+  bool _shouldContinueStatusPolling(auction) {
+    final status = auction.status.toUpperCase();
+
+    if (status == 'ACTIVE') {
+      return true;
+    }
+
+    if (status == 'ENDED' && auction.highestBidderId != null) {
+      return true;
+    }
+
+    return false;
+  }
+
+  String _resolveViewerStatus(
+    BuildContext context,
+    auction, {
+    required bool isAuctionCreator,
+  }) {
+    final effectiveStatus = _resolveEffectiveStatus(auction);
+
+    if ((effectiveStatus == 'WAITING_CONFIRMATION' ||
+            effectiveStatus == 'SETTLED') &&
+        !isAuctionCreator &&
+        !_isWinner(context, auction)) {
+      return 'ENDED';
+    }
+
+    return effectiveStatus;
+  }
+
   void _showConfirmDialog(BuildContext context, auction) {
     final bloc = context.read<AuctionDetailBloc>();
 
@@ -450,6 +482,11 @@ class _AuctionDetailPageState extends State<AuctionDetailPage> {
         sellerEmail: auction.sellerEmail,
         sellerName: auction.sellerName,
       );
+      final viewerStatus = _resolveViewerStatus(
+        context,
+        auction,
+        isAuctionCreator: isAuctionCreator,
+      );
 
       return RefreshIndicator(
         onRefresh: () async {
@@ -470,7 +507,7 @@ class _AuctionDetailPageState extends State<AuctionDetailPage> {
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      StatusBadge(status: effectiveStatus),
+                      StatusBadge(status: viewerStatus),
                       const SizedBox(height: 8),
                       Align(
                         alignment: Alignment.centerRight,
@@ -764,6 +801,19 @@ class _AuctionDetailPageState extends State<AuctionDetailPage> {
         icon: const Icon(Icons.schedule, color: AppColors.white),
         label: Text(
           'Chưa tới giờ bắt đầu',
+          style: AppTextStyles.labelLarge.copyWith(color: AppColors.white),
+        ),
+      );
+    }
+
+    if (auction.status == 'WAITING_CONFIRMATION' &&
+        _isWinner(context, auction)) {
+      return FloatingActionButton.extended(
+        onPressed: () => _showConfirmDialog(context, auction),
+        backgroundColor: AppColors.success,
+        icon: const Icon(Icons.check_circle, color: AppColors.white),
+        label: Text(
+          'Da nhan duoc hang',
           style: AppTextStyles.labelLarge.copyWith(color: AppColors.white),
         ),
       );

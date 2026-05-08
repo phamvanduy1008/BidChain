@@ -41,12 +41,81 @@ function isSettlementWindowOpen(onChainAuction, latestBlock) {
     return getCurrentAuctionTimestampSeconds() >= onChainAuction.endTime.toNumber() + SETTLEMENT_BUFFER_SECONDS;
 }
 
+function isNonBlockingSettlementError(error) {
+    const message = error?.message || "";
+    return /Auction not ended|cannot estimate gas|UNPREDICTABLE_GAS_LIMIT/i.test(message);
+}
+
+async function ensureAuctionEndedOnChain(auctionContract, auction, onChainAuction) {
+    if (onChainAuction.ended) {
+        return onChainAuction;
+    }
+
+    console.log(`On-chain auction ${auction._id} is not ended yet. Sending endAuction first...`);
+    const endTx = await auctionContract.endAuction(auction.blockchain_id);
+    console.log(`endAuction transaction sent: ${endTx.hash}`);
+
+    const endReceipt = await endTx.wait();
+    if (endReceipt.status !== 1) {
+        throw new Error(`endAuction transaction reverted for auction ${auction._id}`);
+    }
+
+    console.log(`endAuction confirmed in block ${endReceipt.blockNumber}`);
+    const refreshedAuction = await auctionContract.getAuction(auction.blockchain_id);
+
+    if (!refreshedAuction.ended) {
+        throw new Error(`On-chain auction ${auction._id} is still not ended after endAuction`);
+    }
+
+    return refreshedAuction;
+}
+
 async function finalizeNoBidAuction(auction, onChainAuction) {
     await Auction.findByIdAndUpdate(auction._id, {
-        status: onChainAuction.ended ? AUCTION_STATUS.ENDED : AUCTION_STATUS.ENDED,
+        status: AUCTION_STATUS.ENDED,
         settled_on_chain: true,
         end_time: new Date(onChainAuction.endTime.toNumber() * 1000)
     });
+}
+
+async function finalizeWaitingConfirmationWithoutMirrorSettlement(auction, winningBid, seller, onChainAuction) {
+    await Promise.all([
+        Auction.findByIdAndUpdate(auction._id, {
+            status: AUCTION_STATUS.WAITING_CONFIRMATION,
+            settled_on_chain: true,
+            end_time: new Date(onChainAuction.endTime.toNumber() * 1000)
+        }),
+        Notification.create({
+            user_id: winningBid.user_id._id,
+            type: "WON_AUCTION",
+            title: "Chuc mung! Ban da thang dau gia",
+            message: `Ban da thang phien dau gia "${auction.title}" voi gia ${formatVnd(winningBid.amount_vnd)}`,
+            related_id: auction._id
+        }),
+        Notification.create({
+            user_id: seller._id,
+            type: "AUCTION_SOLD",
+            title: "Phien dau gia da ket thuc",
+            message: `Phien dau gia "${auction.title}" da ket thuc. Vui long giao hang de nhan tien.`,
+            related_id: auction._id
+        })
+    ]);
+
+    const io = global.io;
+    if (io) {
+        const payload = {
+            auction_id: auction._id.toString(),
+            status: AUCTION_STATUS.WAITING_CONFIRMATION,
+            start_time: auction.start_time,
+            end_time: new Date(onChainAuction.endTime.toNumber() * 1000),
+            winner_id: winningBid.user_id._id.toString(),
+            highest_bidder_id: winningBid.user_id._id.toString(),
+            server_time: new Date().toISOString()
+        };
+
+        io.to(`auction_${auction._id}`).emit("auction_state_changed", payload);
+        io.to(`auction_${auction._id}`).emit("auction_settled", payload);
+    }
 }
 
 async function finalizeSuccessfulSettlement(auction, winningBid, seller, txHash, onChainAuction) {
@@ -103,6 +172,16 @@ async function finalizeSuccessfulSettlement(auction, winningBid, seller, txHash,
 
     const io = global.io;
     if (io) {
+        const auctionStatePayload = {
+            auction_id: auction._id.toString(),
+            status: AUCTION_STATUS.WAITING_CONFIRMATION,
+            start_time: auction.start_time,
+            end_time: new Date(onChainAuction.endTime.toNumber() * 1000),
+            winner_id: winningBid.user_id._id.toString(),
+            highest_bidder_id: winningBid.user_id._id.toString(),
+            server_time: new Date().toISOString()
+        };
+
         io.to(`user_${winningBid.user_id._id}`).emit("auction_won", {
             auction_id: auction._id,
             title: auction.title,
@@ -116,6 +195,9 @@ async function finalizeSuccessfulSettlement(auction, winningBid, seller, txHash,
             final_price_vnd: winningBid.amount_vnd,
             formatted_final_price: formatVnd(winningBid.amount_vnd)
         });
+
+        io.to(`auction_${auction._id}`).emit("auction_state_changed", auctionStatePayload);
+        io.to(`auction_${auction._id}`).emit("auction_settled", auctionStatePayload);
     }
 }
 
@@ -133,6 +215,9 @@ async function settleAuctionOnChain(auction) {
             return;
         }
 
+        const deployer = walletFromPrivateKey(process.env.DEPLOYER_PRIVATE_KEY);
+        const auctionContract = getAuctionContractAt(auction.contract_address, deployer);
+
         if (onChainAuction.settled) {
             console.log(`Auction ${auction._id} already settled on-chain. Syncing DB state only.`);
             await Auction.findByIdAndUpdate(auction._id, {
@@ -140,6 +225,22 @@ async function settleAuctionOnChain(auction) {
                 settled_on_chain: true,
                 end_time: new Date(onChainAuction.endTime.toNumber() * 1000)
             });
+
+            const io = global.io;
+            if (io) {
+                const payload = {
+                    auction_id: auction._id.toString(),
+                    status: AUCTION_STATUS.WAITING_CONFIRMATION,
+                    start_time: auction.start_time,
+                    end_time: new Date(onChainAuction.endTime.toNumber() * 1000),
+                    winner_id: auction.highest_bidder_id?._id?.toString() || auction.highest_bidder_id?.toString() || null,
+                    highest_bidder_id: auction.highest_bidder_id?._id?.toString() || auction.highest_bidder_id?.toString() || null,
+                    server_time: new Date().toISOString()
+                };
+
+                io.to(`auction_${auction._id}`).emit("auction_state_changed", payload);
+                io.to(`auction_${auction._id}`).emit("auction_settled", payload);
+            }
             return;
         }
 
@@ -163,34 +264,59 @@ async function settleAuctionOnChain(auction) {
             throw new Error(`Seller not found for auction ${auction._id}`);
         }
 
-        const deployer = walletFromPrivateKey(process.env.DEPLOYER_PRIVATE_KEY);
-        const auctionContract = getAuctionContractAt(auction.contract_address, deployer);
-
-        const tx = await auctionContract.settleAuction(
-            auction.blockchain_id,
-            winningBid.user_id.wallet_address,
-            winningBid.amount_wei
+        const endedOnChainAuction = await ensureAuctionEndedOnChain(
+            auctionContract,
+            auction,
+            onChainAuction
         );
 
-        console.log(`Settlement transaction sent: ${tx.hash}`);
-        const receipt = await tx.wait();
-
-        if (receipt.status !== 1) {
-            throw new Error(`Settlement transaction reverted for auction ${auction._id}`);
+        if (!endedOnChainAuction.ended) {
+            console.log(`Skipping ${auction._id}: on-chain auction is still not ended after sync attempt.`);
+            return;
         }
 
-        console.log(`Settlement confirmed in block ${receipt.blockNumber}`);
+        try {
+            const tx = await auctionContract.settleAuction(
+                auction.blockchain_id,
+                winningBid.user_id.wallet_address,
+                winningBid.amount_wei
+            );
 
-        const refreshedOnChainAuction = await auctionContract.getAuction(auction.blockchain_id);
-        await finalizeSuccessfulSettlement(
-            auction,
-            winningBid,
-            seller,
-            tx.hash,
-            refreshedOnChainAuction
-        );
+            console.log(`Settlement transaction sent: ${tx.hash}`);
+            const receipt = await tx.wait();
 
-        console.log(`Auction ${auction._id} settled successfully`);
+            if (receipt.status !== 1) {
+                throw new Error(`Settlement transaction reverted for auction ${auction._id}`);
+            }
+
+            console.log(`Settlement confirmed in block ${receipt.blockNumber}`);
+
+            const refreshedOnChainAuction = await auctionContract.getAuction(auction.blockchain_id);
+            await finalizeSuccessfulSettlement(
+                auction,
+                winningBid,
+                seller,
+                tx.hash,
+                refreshedOnChainAuction
+            );
+
+            console.log(`Auction ${auction._id} settled successfully`);
+        } catch (settlementError) {
+            if (!isNonBlockingSettlementError(settlementError)) {
+                throw settlementError;
+            }
+
+            console.warn(
+                `Mirror settlement skipped for auction ${auction._id}: ${settlementError.message}`
+            );
+            const refreshedOnChainAuction = await auctionContract.getAuction(auction.blockchain_id);
+            await finalizeWaitingConfirmationWithoutMirrorSettlement(
+                auction,
+                winningBid,
+                seller,
+                refreshedOnChainAuction
+            );
+        }
     } catch (error) {
         console.error(`Settlement failed for auction ${auction._id}:`, error.message || error);
     }
@@ -199,7 +325,7 @@ async function settleAuctionOnChain(auction) {
 async function runSettlementCron() {
     try {
         const candidates = await Auction.find({
-            status: AUCTION_STATUS.ENDED,
+            status: AUCTION_STATUS.WAITING_CONFIRMATION,
             settled_on_chain: false,
             blockchain_id: { $exists: true, $ne: null },
             contract_address: { $exists: true, $ne: null }
