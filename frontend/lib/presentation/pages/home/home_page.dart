@@ -3,13 +3,13 @@ import 'dart:math';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:frontend/core/services/server_time_service.dart';
-import 'package:frontend/core/services/socket_service.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../config/routes/app_routes.dart';
 import '../../../config/theme/app_colors.dart';
 import '../../../config/theme/app_text_styles.dart';
+import '../../../core/services/server_time_service.dart';
+import '../../../core/services/socket_service.dart';
 import '../../../core/utils/app_localizations.dart';
 import '../../../core/utils/auction_status_resolver.dart';
 import '../../bloc/auction/auction_bloc.dart';
@@ -144,113 +144,28 @@ class _HomePageState extends State<HomePage>
                     title: 'Các phiên đấu giá',
                     auctions: randomAuctions,
                     state: state,
-                    emptyMessage: _searchQuery.isNotEmpty
-                        ? 'Chưa có phiên đấu giá phù hợp với từ khóa tìm kiếm'
-                        : _selectedCategoryId != null
-                        ? 'Chưa có phiên đấu giá trong danh mục này'
-                        : 'Hiện chưa có phiên đấu giá nào',
+                    seeAllRoute: AppRoutes.auctionList,
+                    emptyMessage: _buildAllAuctionsEmptyMessage(),
                   ),
                 );
               },
             ),
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20),
-                child: SectionHeader(
-                  title: 'Phiên đang diễn ra',
-                  onSeeAllTap: () => context.go(AppRoutes.auctionList),
-                ),
-              ),
+            _buildAuctionGridSection(
+              title: 'Phiên đang diễn ra',
+              seeAllRoute: '${AppRoutes.auctionList}?status=active',
+              emptyMessage: _buildSectionEmptyMessageByType('active'),
+              auctionSelector: (loadedState) =>
+                  _filterAuctions(loadedState.activeAuctions),
             ),
-            const SliverToBoxAdapter(child: SizedBox(height: 16)),
-            BlocBuilder<AuctionBloc, AuctionState>(
-              builder: (context, state) {
-                if (state is AuctionLoading) {
-                  return const SliverFillRemaining(
-                    child: Center(
-                      child: CircularProgressIndicator(color: AppColors.black),
-                    ),
-                  );
-                }
-
-                if (state is AuctionError) {
-                  return SliverFillRemaining(
-                    child: Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          const Icon(
-                            Icons.error_outline,
-                            size: 48,
-                            color: AppColors.black,
-                          ),
-                          const SizedBox(height: 16),
-                          Text(state.message, style: AppTextStyles.bodyMedium),
-                          const SizedBox(height: 16),
-                          ElevatedButton(
-                            onPressed: () {
-                              context.read<AuctionBloc>().add(RefreshAuctions());
-                            },
-                            child: const Text('Thử lại'),
-                          ),
-                        ],
-                      ),
-                    ),
-                  );
-                }
-
-                if (state is AuctionLoaded) {
-                  final filteredAuctions = _filterAuctions(state.activeAuctions);
-
-                  if (filteredAuctions.isEmpty) {
-                    return SliverFillRemaining(
-                      child: Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(
-                              Icons.inbox_outlined,
-                              size: 64,
-                              color: AppColors.grey.withOpacity(0.5),
-                            ),
-                            const SizedBox(height: 16),
-                            Text(
-                              _searchQuery.isNotEmpty
-                                  ? 'Không tìm thấy phiên đấu giá cho "$_searchQuery"'
-                                  : _selectedCategoryId != null
-                                  ? 'Không có phiên đấu giá nào trong danh mục này'
-                                  : 'Hiện chưa có phiên đấu giá đang diễn ra',
-                              textAlign: TextAlign.center,
-                              style: AppTextStyles.bodyMedium.copyWith(
-                                color: AppColors.grey,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    );
-                  }
-
-                  return SliverPadding(
-                    padding: const EdgeInsets.symmetric(horizontal: 20),
-                    sliver: SliverGrid(
-                      gridDelegate:
-                          const SliverGridDelegateWithFixedCrossAxisCount(
-                            crossAxisCount: 2,
-                            childAspectRatio: 0.57,
-                            crossAxisSpacing: 16,
-                            mainAxisSpacing: 16,
-                          ),
-                      delegate: SliverChildBuilderDelegate((context, index) {
-                        final auction = filteredAuctions[index];
-                        return _buildAuctionCard(auction);
-                      }, childCount: filteredAuctions.length),
-                    ),
-                  );
-                }
-
-                return const SliverToBoxAdapter(child: SizedBox.shrink());
-              },
+            _buildAuctionGridSection(
+              title: 'Phiên sắp diễn ra',
+              seeAllRoute: '${AppRoutes.auctionList}?status=upcoming',
+              emptyMessage: _buildSectionEmptyMessageByType('upcoming'),
+              auctionSelector: (loadedState) => _filterAuctions(
+                loadedState.auctions.where((auction) {
+                  return auction.status.toUpperCase() == 'APPROVED';
+                }).toList(),
+              ),
             ),
             const SliverToBoxAdapter(child: SizedBox(height: 120)),
           ],
@@ -286,7 +201,7 @@ class _HomePageState extends State<HomePage>
                 ),
               ),
               onPressed: () {
-                context.push('/notifications');
+                context.push(AppRoutes.notifications);
               },
             );
           },
@@ -404,6 +319,7 @@ class _HomePageState extends State<HomePage>
     required List<dynamic> auctions,
     required AuctionState state,
     required String emptyMessage,
+    required String seeAllRoute,
   }) {
     return Column(
       children: [
@@ -411,7 +327,7 @@ class _HomePageState extends State<HomePage>
           padding: const EdgeInsets.symmetric(horizontal: 20),
           child: SectionHeader(
             title: title,
-            onSeeAllTap: () => context.go(AppRoutes.auctionList),
+            onSeeAllTap: () => context.go(seeAllRoute),
           ),
         ),
         const SizedBox(height: 16),
@@ -446,6 +362,95 @@ class _HomePageState extends State<HomePage>
           ),
         const SizedBox(height: 32),
       ],
+    );
+  }
+
+  Widget _buildAuctionGridSection({
+    required String title,
+    required String seeAllRoute,
+    required String emptyMessage,
+    required List<dynamic> Function(AuctionLoaded) auctionSelector,
+  }) {
+    return BlocBuilder<AuctionBloc, AuctionState>(
+      builder: (context, state) {
+        if (state is AuctionLoading) {
+          return const SliverToBoxAdapter(
+            child: Padding(
+              padding: EdgeInsets.symmetric(vertical: 32),
+              child: Center(
+                child: CircularProgressIndicator(color: AppColors.black),
+              ),
+            ),
+          );
+        }
+
+        if (state is AuctionError) {
+          return SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(20, 0, 20, 32),
+              child: Column(
+                children: [
+                  _buildSectionHeader(title, seeAllRoute),
+                  const SizedBox(height: 16),
+                  _buildSectionEmptyState(state.message),
+                ],
+              ),
+            ),
+          );
+        }
+
+        if (state is AuctionLoaded) {
+          final auctions = auctionSelector(state);
+
+          return SliverMainAxisGroup(
+            slivers: [
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  child: SectionHeader(
+                    title: title,
+                    onSeeAllTap: () => context.go(seeAllRoute),
+                  ),
+                ),
+              ),
+              const SliverToBoxAdapter(child: SizedBox(height: 16)),
+              if (auctions.isEmpty)
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 0, 20, 32),
+                    child: _buildSectionEmptyState(emptyMessage),
+                  ),
+                )
+              else
+                SliverPadding(
+                  padding: const EdgeInsets.fromLTRB(20, 0, 20, 32),
+                  sliver: SliverGrid(
+                    gridDelegate:
+                        const SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: 2,
+                          childAspectRatio: 0.57,
+                          crossAxisSpacing: 16,
+                          mainAxisSpacing: 16,
+                        ),
+                    delegate: SliverChildBuilderDelegate((context, index) {
+                      final auction = auctions[index];
+                      return _buildAuctionCard(auction);
+                    }, childCount: auctions.length),
+                  ),
+                ),
+            ],
+          );
+        }
+
+        return const SliverToBoxAdapter(child: SizedBox.shrink());
+      },
+    );
+  }
+
+  Widget _buildSectionHeader(String title, String route) {
+    return SectionHeader(
+      title: title,
+      onSeeAllTap: () => context.go(route),
     );
   }
 
@@ -515,6 +520,29 @@ class _HomePageState extends State<HomePage>
     }
 
     return filteredAuctions;
+  }
+
+  String _buildAllAuctionsEmptyMessage() {
+    if (_searchQuery.isNotEmpty) {
+      return 'Chưa có phiên đấu giá phù hợp với từ khóa tìm kiếm';
+    }
+    if (_selectedCategoryId != null) {
+      return 'Chưa có phiên đấu giá trong danh mục này';
+    }
+    return 'Hiện chưa có phiên đấu giá nào';
+  }
+
+  String _buildSectionEmptyMessageByType(String type) {
+    if (_searchQuery.isNotEmpty) {
+      return 'Không tìm thấy phiên đấu giá cho "$_searchQuery"';
+    }
+    if (_selectedCategoryId != null) {
+      return 'Không có phiên đấu giá nào trong danh mục này';
+    }
+    if (type == 'upcoming') {
+      return 'Hiện chưa có phiên đấu giá sắp diễn ra';
+    }
+    return 'Hiện chưa có phiên đấu giá đang diễn ra';
   }
 
   IconData _getCategoryIcon(String categoryName) {

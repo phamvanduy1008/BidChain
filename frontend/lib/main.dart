@@ -23,9 +23,9 @@ class ApiConfig {
     if (kIsWeb) {
       baseUrl = 'http://localhost:3000';
     } else if (defaultTargetPlatform == TargetPlatform.android) {
-      baseUrl = 'http://192.168.88.239:3000';
+      baseUrl = 'http://192.168.56.1:3000';
     } else {
-      baseUrl = 'http://192.168.88.239:3000';
+      baseUrl = 'http://192.168.56.1:3000';
     }
   }
 }

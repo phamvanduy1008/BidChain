@@ -60,7 +60,9 @@ final GoRouter appRouter = GoRouter(
         ),
         GoRoute(
           path: AppRoutes.auctionList,
-          builder: (context, state) => const AuctionListPage(),
+          builder: (context, state) => AuctionListPage(
+            statusFilter: state.uri.queryParameters['status'],
+          ),
         ),
         GoRoute(
           path: AppRoutes.createAuction,
