@@ -19,6 +19,22 @@ class _GlobalSocketListenerState extends State<GlobalSocketListener> {
   final SocketService _socketService = SocketService();
   StreamSubscription<dynamic>? _notificationSubscription;
 
+  bool _shouldSuppressPopup(Map<String, dynamic> payload) {
+    final currentPath =
+        GoRouter.of(context).routeInformationProvider.value.uri.path;
+    if (!currentPath.startsWith('${AppRoutes.auctionDetail}/')) {
+      return false;
+    }
+
+    final relatedId = payload['related_id']?.toString();
+    if (relatedId == null || relatedId.isEmpty) {
+      return false;
+    }
+
+    final currentAuctionId = currentPath.split('/').last;
+    return relatedId == currentAuctionId;
+  }
+
   @override
   void initState() {
     super.initState();
@@ -30,6 +46,10 @@ class _GlobalSocketListenerState extends State<GlobalSocketListener> {
       }
 
       final payload = Map<String, dynamic>.from(data);
+      if (_shouldSuppressPopup(payload)) {
+        return;
+      }
+
       NotificationPopupService.show(
         context: context,
         title: payload['title']?.toString() ?? 'Thong bao moi',

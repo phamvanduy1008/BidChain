@@ -6,7 +6,6 @@ const Bid = require("../models/Bid");
 const User = require("../models/User");
 const Notification = require("../models/Notification");
 const { provider, walletFromPrivateKey } = require("../blockchain/contract");
-const { settleBid, isWalletContractAvailable } = require("../blockchain/wallet-contract");
 const { formatVnd } = require("../utils/conversion");
 const { AUCTION_STATUS } = require("../config/constants");
 const { getCurrentAuctionTimestampSeconds } = require("../utils/auctionTime");
@@ -52,47 +51,14 @@ function isSettlementWindowOpen(auction) {
     return getCurrentAuctionTimestampSeconds() >= endTimestamp + SETTLEMENT_BUFFER_SECONDS;
 }
 
-async function finalizeSuccessfulSettlement(auction, winningBid, seller, txHash) {
-    const winnerLockedBigInt = BigInt(winningBid.user_id.locked_eth || "0");
-    const winnerBalanceBigInt = BigInt(winningBid.user_id.balance_eth || "0");
-    const sellerBalanceBigInt = BigInt(seller.balance_eth || "0");
-    const bidAmountBigInt = BigInt(winningBid.amount_wei);
-
-    if (winnerLockedBigInt < bidAmountBigInt) {
-        throw new Error(
-            `Winner locked balance is insufficient for settlement: locked=${winnerLockedBigInt} amount=${bidAmountBigInt}`
-        );
-    }
-
-    if (winnerBalanceBigInt < bidAmountBigInt) {
-        throw new Error(
-            `Winner total balance is insufficient for settlement: balance=${winnerBalanceBigInt} amount=${bidAmountBigInt}`
-        );
-    }
-
-    const newWinnerLocked = (winnerLockedBigInt - bidAmountBigInt).toString();
-    const newWinnerBalance = (winnerBalanceBigInt - bidAmountBigInt).toString();
-    const newSellerBalance = (sellerBalanceBigInt + bidAmountBigInt).toString();
-
+async function finalizeSuccessfulSettlement(auction, winningBid, seller) {
     await Promise.all([
         Auction.findByIdAndUpdate(auction._id, {
             status: AUCTION_STATUS.WAITING_CONFIRMATION,
-            settled_on_chain: true,
-            settlement_tx: txHash
-        }),
-        User.findByIdAndUpdate(winningBid.user_id._id, {
-            $set: {
-                locked_eth: newWinnerLocked,
-                balance_eth: newWinnerBalance
-            }
-        }),
-        User.findByIdAndUpdate(seller._id, {
-            $set: {
-                balance_eth: newSellerBalance
-            }
+            settled_on_chain: true
         }),
         Bid.findByIdAndUpdate(winningBid._id, {
-            tx_settle_hash: txHash
+            status: "WINNING"
         }),
         Notification.create({
             user_id: winningBid.user_id._id,
@@ -119,7 +85,6 @@ async function finalizeSuccessfulSettlement(auction, winningBid, seller, txHash)
             end_time: auction.end_time,
             winner_id: winningBid.user_id._id.toString(),
             highest_bidder_id: winningBid.user_id._id.toString(),
-            settlement_tx: txHash,
             server_time: new Date().toISOString()
         };
 
@@ -144,7 +109,7 @@ async function finalizeSuccessfulSettlement(auction, winningBid, seller, txHash)
 
 async function settleAuctionOnChain(auction) {
     try {
-        console.log(`\n========== Settling Auction ${auction._id} ==========`);
+        console.log(`\n========== Preparing Settlement for Auction ${auction._id} ==========`);
 
         if (!isSettlementWindowOpen(auction)) {
             console.log(
@@ -177,20 +142,8 @@ async function settleAuctionOnChain(auction) {
         }
 
         await mirrorAuctionEndedOnChain(auction);
-
-        if (!isWalletContractAvailable()) {
-            throw new Error("BidChainWallet contract is not configured");
-        }
-
-        const result = await settleBid(
-            winningBid.user_id.wallet_address,
-            seller.wallet_address,
-            auction.blockchain_id,
-            winningBid.amount_wei
-        );
-
-        await finalizeSuccessfulSettlement(auction, winningBid, seller, result.txHash);
-        console.log(`Auction ${auction._id} settled successfully via BidChainWallet`);
+        await finalizeSuccessfulSettlement(auction, winningBid, seller);
+        console.log(`Auction ${auction._id} moved to WAITING_CONFIRMATION`);
     } catch (error) {
         console.error(`Settlement failed for auction ${auction._id}:`, error.message || error);
     }

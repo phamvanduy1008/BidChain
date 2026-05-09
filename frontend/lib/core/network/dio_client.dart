@@ -36,6 +36,10 @@ class DioClient {
     );
   }
 
+  String get baseUrl => _dio.options.baseUrl;
+
+  String get socketBaseUrl => baseUrl.replaceFirst(RegExp(r'/api$'), '');
+
   Future<Response> get(
     String path, {
     Map<String, dynamic>? queryParameters,

@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:frontend/config/routes/app_routes.dart';
+import 'package:frontend/core/network/dio_client.dart';
 import 'package:frontend/core/services/socket_service.dart';
 import 'package:go_router/go_router.dart';
 import '../../../config/theme/app_colors.dart';
@@ -38,13 +39,19 @@ class AuctionDetailPage extends StatefulWidget {
 
 class _AuctionDetailPageState extends State<AuctionDetailPage> {
   final SocketService _socketService = SocketService();
+  final DioClient _dioClient = DioClient();
   StreamSubscription<Map<String, dynamic>>? _auctionEventSubscription;
   Timer? _countdownExpiryRefreshTimer;
   Timer? _statusTransitionPollTimer;
+  String? _lastOutcomeModalKey;
+  Map<String, dynamic>? _pendingOutcomeEvent;
+  String? _lastObservedAuctionStatus;
+  bool _hasInitializedOutcomeTracking = false;
 
   @override
   void initState() {
     super.initState();
+    _ensureSocketConnected();
     context.read<AuctionDetailBloc>().add(
       LoadAuctionDetail(auctionId: widget.auctionId),
     );
@@ -64,6 +71,27 @@ class _AuctionDetailPageState extends State<AuctionDetailPage> {
   }
 
   // ==================== SOCKET EVENT HANDLERS ====================
+  void _ensureSocketConnected() {
+    final authState = context.read<AuthBloc>().state;
+    if (authState is! AuthSuccessState) {
+      return;
+    }
+
+    if (!_socketService.isConnected) {
+      _socketService.connect(
+        authState.user.id,
+        baseUrl: _dioClient.socketBaseUrl,
+      );
+    }
+  }
+
+  String? _currentUserId(BuildContext context) {
+    final authState = context.read<AuthBloc>().state;
+    if (authState is AuthSuccessState) {
+      return authState.user.id;
+    }
+    return null;
+  }
 
   void _handleAuctionEvent(Map<String, dynamic> event) {
     if (!mounted || event['auction_id']?.toString() != widget.auctionId) {
@@ -72,14 +100,137 @@ class _AuctionDetailPageState extends State<AuctionDetailPage> {
 
     final eventName = event['event_name']?.toString();
 
-    // Refresh auction data
-    context.read<AuctionDetailBloc>().add(
-      RefreshAuctionDetail(auctionId: widget.auctionId),
-    );
+    if (eventName == 'auction_ended') {
+      _pendingOutcomeEvent = event;
+    }
 
     if (eventName == 'user_outbid') {
       _showOutbidDialog();
     }
+
+    context.read<AuctionDetailBloc>().add(
+      RefreshAuctionDetail(auctionId: widget.auctionId),
+    );
+  }
+
+  bool _hasUserBid(BuildContext context, auction) {
+    final userId = _currentUserId(context);
+    if (userId == null) {
+      return false;
+    }
+
+    return auction.bids.any((bid) => bid.userId == userId);
+  }
+
+  bool _isOutcomeStatus(String status) {
+    return {'ENDED', 'WAITING_CONFIRMATION', 'SETTLED'}.contains(
+      status.toUpperCase(),
+    );
+  }
+
+  bool _shouldShowOutcomeFromTransition(String currentStatus) {
+    final previousStatus = _lastObservedAuctionStatus;
+    if (previousStatus == null) {
+      return false;
+    }
+
+    return !_isOutcomeStatus(previousStatus) && _isOutcomeStatus(currentStatus);
+  }
+
+  Map<String, dynamic> _buildOutcomeEventFromAuction(auction) {
+    return <String, dynamic>{
+      'auction_id': auction.id,
+      'winner_id': auction.highestBidderId,
+    };
+  }
+
+  void _showAuctionOutcomeModal(
+    Map<String, dynamic> event,
+    auction,
+  ) {
+    final userId = _currentUserId(context);
+    if (userId == null) {
+      return;
+    }
+    final winnerId =
+        event['winner_id']?.toString() ?? auction.highestBidderId?.toString();
+    final isAuctionCreator = _isAuctionCreator(
+      context,
+      sellerId: auction.sellerId,
+      sellerEmail: auction.sellerEmail,
+      sellerName: auction.sellerName,
+    );
+    final hasAnyBid = auction.bids.isNotEmpty;
+    final hasUserBid = _hasUserBid(context, auction);
+
+    late final String modalKey;
+    late final String title;
+    late final String message;
+
+    if (winnerId != null && winnerId == userId && !isAuctionCreator) {
+      modalKey = 'won_${auction.id}';
+      title = 'Bạn đã chiến thắng';
+      message =
+          'Phiên đấu giá "${auction.title}" đã kết thúc và bạn là người trả giá cao nhất.';
+    } else if (winnerId != null && hasUserBid && !isAuctionCreator) {
+      modalKey = 'lost_${auction.id}';
+      title = 'Bạn đã thua';
+      message =
+          'Phiên đấu giá "${auction.title}" đã kết thúc. Bạn không phải là người chiến thắng.';
+    } else {
+      modalKey = 'ended_${auction.id}';
+      title = 'Phiên đấu giá đã kết thúc';
+      message = hasAnyBid
+          ? 'Phiên đấu giá "${auction.title}" đã kết thúc.'
+          : 'Phiên đấu giá "${auction.title}" đã kết thúc mà chưa có lượt đặt giá nào.';
+    }
+
+    if (_lastOutcomeModalKey == modalKey) {
+      return;
+    }
+    _lastOutcomeModalKey = modalKey;
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) => AlertDialog(
+        title: Text(title),
+        content: Text(message),
+        actions: [
+          ElevatedButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.accent,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('OK'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showReceiptConfirmedModal() {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Chúc mừng bạn đã nhận hàng thành công'),
+        content: const Text(
+          'Giao dịch đã hoàn tất. Tiền giữ khóa đã được xử lý thành công.',
+        ),
+        actions: [
+          ElevatedButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.success,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('OK'),
+          ),
+        ],
+      ),
+    );
   }
 
   void _showOutbidDialog() {
@@ -214,6 +365,34 @@ class _AuctionDetailPageState extends State<AuctionDetailPage> {
   Widget build(BuildContext context) {
     return BlocConsumer<AuctionDetailBloc, AuctionDetailState>(
       listener: (context, state) {
+        if (state is AuctionDetailLoaded) {
+          final currentStatus = state.auction.status.toUpperCase();
+          if (!_hasInitializedOutcomeTracking) {
+            _lastObservedAuctionStatus = currentStatus;
+            _hasInitializedOutcomeTracking = true;
+            return;
+          }
+
+          final pendingEvent = _pendingOutcomeEvent;
+          final shouldShowFromTransition = _shouldShowOutcomeFromTransition(
+            currentStatus,
+          );
+
+          if (pendingEvent != null || shouldShowFromTransition) {
+            final event =
+                pendingEvent ??
+                _buildOutcomeEventFromAuction(state.auction);
+
+            _pendingOutcomeEvent = null;
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (!mounted) return;
+              _showAuctionOutcomeModal(event, state.auction);
+            });
+          }
+
+          _lastObservedAuctionStatus = currentStatus;
+        }
+
         if (state is BidPlaced) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
@@ -232,14 +411,11 @@ class _AuctionDetailPageState extends State<AuctionDetailPage> {
             ),
           );
         } else if (state is ReceiptConfirmed) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(state.message),
-              backgroundColor: AppColors.success,
-              behavior: SnackBarBehavior.floating,
-            ),
-          );
           context.read<AuthBloc>().add(const AuthCheckStatusEvent());
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (!mounted) return;
+            _showReceiptConfirmedModal();
+          });
         } else if (state is ReceiptError) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
@@ -308,11 +484,7 @@ class _AuctionDetailPageState extends State<AuctionDetailPage> {
   }
 
   bool _isWinner(BuildContext context, auction) {
-    final authState = context.read<AuthBloc>().state;
-    if (authState is AuthSuccessState) {
-      return authState.user.id == auction.highestBidderId;
-    }
-    return false;
+    return _currentUserId(context) == auction.highestBidderId;
   }
 
   String _resolveEffectiveStatus(auction) {
@@ -343,11 +515,24 @@ class _AuctionDetailPageState extends State<AuctionDetailPage> {
     required bool isAuctionCreator,
   }) {
     final effectiveStatus = _resolveEffectiveStatus(auction);
+    final isWinner = _isWinner(context, auction);
+    final hasUserBid = _hasUserBid(context, auction);
+
+    if (effectiveStatus == 'ENDED' && !isAuctionCreator && !isWinner && hasUserBid) {
+      return 'LOST_VIEW';
+    }
 
     if ((effectiveStatus == 'WAITING_CONFIRMATION' ||
             effectiveStatus == 'SETTLED') &&
-        !isAuctionCreator &&
-        !_isWinner(context, auction)) {
+        !isAuctionCreator) {
+      if (isWinner) {
+        return effectiveStatus;
+      }
+
+      if (hasUserBid) {
+        return 'LOST_VIEW';
+      }
+
       return 'ENDED';
     }
 
@@ -770,19 +955,6 @@ class _AuctionDetailPageState extends State<AuctionDetailPage> {
         icon: const Icon(Icons.schedule, color: AppColors.white),
         label: Text(
           'Chưa tới giờ bắt đầu',
-          style: AppTextStyles.labelLarge.copyWith(color: AppColors.white),
-        ),
-      );
-    }
-
-    if (auction.status == 'WAITING_CONFIRMATION' &&
-        _isWinner(context, auction)) {
-      return FloatingActionButton.extended(
-        onPressed: () => _showConfirmDialog(context, auction),
-        backgroundColor: AppColors.success,
-        icon: const Icon(Icons.check_circle, color: AppColors.white),
-        label: Text(
-          'Da nhan duoc hang',
           style: AppTextStyles.labelLarge.copyWith(color: AppColors.white),
         ),
       );

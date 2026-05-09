@@ -13,6 +13,7 @@ class SocketService {
   io.Socket? _socket;
   String? _userId;
   Function(UserModel)? onBalanceUpdated;
+  final Set<String> _joinedAuctionRooms = <String>{};
 
   final _notificationController = StreamController<dynamic>.broadcast();
   final _auctionEventController =
@@ -46,6 +47,9 @@ class SocketService {
 
     _socket!.onConnect((_) {
       _socket!.emit('join_user_room', userId);
+      for (final auctionId in _joinedAuctionRooms) {
+        _socket!.emit('join_auction', auctionId);
+      }
     });
 
     _socket!.on('balance_updated', (data) async {
@@ -90,6 +94,9 @@ class SocketService {
       if (_userId != null) {
         _socket!.emit('join_user_room', _userId);
       }
+      for (final auctionId in _joinedAuctionRooms) {
+        _socket!.emit('join_auction', auctionId);
+      }
     });
   }
 
@@ -107,18 +114,21 @@ class SocketService {
   }
 
   void joinAuctionRoom(String auctionId) {
+    _joinedAuctionRooms.add(auctionId);
     if (_socket?.connected == true) {
       _socket!.emit('join_auction', auctionId);
     }
   }
 
   void leaveAuctionRoom(String auctionId) {
+    _joinedAuctionRooms.remove(auctionId);
     if (_socket?.connected == true) {
       _socket!.emit('leave_auction', auctionId);
     }
   }
 
   void disconnect() {
+    _joinedAuctionRooms.clear();
     _socket?.disconnect();
     _socket?.dispose();
     _socket = null;
